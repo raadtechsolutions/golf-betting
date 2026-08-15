@@ -104,6 +104,13 @@
       <div><label>CTP bet / player ($)</label><input type="number" id="betCtp" value="10" min="0" step="1"></div>
       <div><label>Robin $ / point</label><input type="number" id="betRobin" value="1" min="0" step="0.5"></div>
     </div>
+    <h3>Games played</h3>
+    <p class="hint">Only checked games are counted in the payouts.</p>
+    <div class="togglerow">
+      <label><input class="cb" type="checkbox" id="g-robin" checked onchange="onGamesChange()"> Robin</label>
+      <label><input class="cb" type="checkbox" id="g-medal" checked onchange="onGamesChange()"> Medal</label>
+      <label><input class="cb" type="checkbox" id="g-ctp" checked onchange="onGamesChange()"> Closest to the pin</label>
+    </div>
     <h3>Players &amp; handicaps</h3>
     <p class="hint">Filled automatically by the import (handicap from Grint). Robin pairs rotate inside each foursome (players 1–4, 5–8, 9–12…).</p>
     <div class="player-grid" id="playerGrid"></div>
@@ -112,6 +119,7 @@
       <button class="ghost small" onclick="loadSample()">Load sample round</button>
       <button class="ghost small" onclick="resetAll()">Clear everything</button>
     </div>
+    <div id="robinVarsBlock">
     <h3>Robin point variables</h3>
     <p class="hint">Variables missing from the screenshots are switched off automatically.</p>
     <div class="togglerow">
@@ -120,6 +128,7 @@
       <label><input class="cb" type="checkbox" id="rv-low" checked onchange="renderResults()"> Low ball</label>
       <label><input class="cb" type="checkbox" id="rv-comb" checked onchange="renderResults()"> Combined score</label>
       <label><input class="cb" type="checkbox" id="rv-putts" checked onchange="renderResults()"> Putts</label>
+    </div>
     </div>
     <h3>Prize split</h3>
     <p class="hint">Applied to the Medal and CTP pools. Robin settles player-to-player at $/point.</p>
@@ -135,13 +144,13 @@
     <div class="scroll" id="scorecardWrap"></div>
   </section>
 
-  <section class="card">
+  <section class="card" id="cardPairings">
     <h2>4 · Robin pairings</h2>
     <p class="hint">Default rotation: 1&2 v 3&4 → 1&3 v 2&4 → 1&4 v 2&3 every six holes. Adjust to match who actually played together.</p>
     <div id="pairingsWrap"></div>
   </section>
 
-  <section class="card">
+  <section class="card" id="cardCtp">
     <h2>5 · Closest to the pin</h2>
     <p class="hint">Pick the winner on each par 3 (leave blank if nobody hit the green).</p>
     <div id="ctpWrap"></div>
@@ -357,6 +366,23 @@ function getSplits(){
     largeThreshold:9,
   };
 }
+function getGames(){
+  return {
+    robin:document.getElementById('g-robin').checked,
+    medal:document.getElementById('g-medal').checked,
+    ctp:document.getElementById('g-ctp').checked,
+  };
+}
+function onGamesChange(){
+  const g=getGames();
+  document.getElementById('cardPairings').style.display=g.robin?'':'none';
+  document.getElementById('robinVarsBlock').style.display=g.robin?'':'none';
+  document.getElementById('cardCtp').style.display=g.ctp?'':'none';
+  document.getElementById('betMedal').disabled=!g.medal;
+  document.getElementById('betCtp').disabled=!g.ctp;
+  document.getElementById('betRobin').disabled=!g.robin;
+  renderResults();
+}
 function getRobinVars(){
   return {
     fir:document.getElementById('rv-fir').checked,
@@ -469,14 +495,26 @@ function renderResults(){
     bets:getBets(),payoutSplits:getSplits(),robinVars:getRobinVars(),
   };
   const r=computeAll(round);
+  const G=getGames();
+  if(!G.robin&&!G.medal&&!G.ctp){wrap.innerHTML='<p class="hint">No games selected — check at least one game in section 2.</p>';return;}
+  const gTotal={};
+  state.players.forEach(p=>{
+    gTotal[p.id]=round2((G.robin?(r.robinPay.net[p.id]||0):0)+(G.medal?(r.medal.net[p.id]||0):0)+(G.ctp?(r.ctp.net[p.id]||0):0));
+  });
   let html='';
-  html+='<h3>💰 Who owes what (grand total)</h3><table class="totals-table"><thead><tr><th style="text-align:left">Player</th><th>Robin</th><th>Medal</th><th>CTP</th><th>Total</th></tr></thead><tbody>';
-  const order=[...state.players].sort((a,b)=>(r.total[b.id]||0)-(r.total[a.id]||0));
+  html+='<h3>💰 Who owes what (grand total)</h3><table class="totals-table"><thead><tr><th style="text-align:left">Player</th>'
+    +(G.robin?'<th>Robin</th>':'')+(G.medal?'<th>Medal</th>':'')+(G.ctp?'<th>CTP</th>':'')+'<th>Total</th></tr></thead><tbody>';
+  const order=[...state.players].sort((a,b)=>(gTotal[b.id]||0)-(gTotal[a.id]||0));
   order.forEach(p=>{
-    html+=`<tr><td>${esc(p.name)}</td><td>${money(r.robinPay.net[p.id])}</td><td>${money(r.medal.net[p.id])}</td><td>${money(r.ctp.net[p.id])}</td><td>${money(r.total[p.id])}</td></tr>`;
+    html+=`<tr><td>${esc(p.name)}</td>`
+      +(G.robin?`<td>${money(r.robinPay.net[p.id])}</td>`:'')
+      +(G.medal?`<td>${money(r.medal.net[p.id])}</td>`:'')
+      +(G.ctp?`<td>${money(r.ctp.net[p.id])}</td>`:'')
+      +`<td>${money(gTotal[p.id])}</td></tr>`;
   });
   html+='</tbody></table>';
 
+  if(G.medal){
   html+=`<h3>🏌️ Medal — pool $${r.medal.pool}</h3><table><thead><tr><th style="text-align:left">Player</th><th>Gross</th><th>Hcp</th><th>Net</th><th>Place</th><th>Wins</th></tr></thead><tbody>`;
   const medalRank=Object.fromEntries(r.medal.ranked.map(x=>[x.id,x]));
   [...r.medal.entries].sort((a,b)=>a.net-b.net).forEach(e=>{
@@ -486,7 +524,9 @@ function renderResults(){
     html+=`<tr class="${paid>0?'winner':''}"><td style="text-align:left">${esc(p.name)}</td><td>${e.gross}</td><td>${p.handicap||0}</td><td><b>${e.net}</b></td><td>${rk.rank}${rk.tieSize>1?' (T)':''}</td><td>${paid>0?'$'+paid:'—'}</td></tr>`;
   });
   html+='</tbody></table>';
+  }
 
+  if(G.robin){
   const V=round.robinVars;
   const offVars=[['fir','fairways'],['gir','greens'],['low','low ball'],['combined','combined'],['putts','putts']].filter(([k])=>!V[k]).map(([,n])=>n);
   html+=`<h3>🐦 Robin — $${round.bets.robinPerPoint}/point${offVars.length?` <span class="pill warn">off: ${offVars.join(', ')}</span>`:''}</h3>`;
@@ -501,12 +541,15 @@ function renderResults(){
     r.robinPay.matrix.forEach(m=>{html+=`<li>${esc(pname(m.from))} pays ${esc(pname(m.to))} <b>$${m.amount}</b></li>`;});
     html+='</ul>';
   }
+  }
 
+  if(G.ctp){
   html+=`<h3>🎯 Closest to the pin — pool $${r.ctp.pool}</h3>`;
   const winners=Object.entries(r.ctp.wins).filter(([,n])=>n>0);
   if(!winners.length){html+='<p class="hint">No CTP winners selected yet (section 5).</p>';}
   else{
     html+='<div>'+winners.sort((a,b)=>b[1]-a[1]).map(([id,n])=>`<span class="pill">${esc(pname(id))}: ${n} win${n>1?'s':''} ${r.ctp.payouts[id]?'→ $'+r.ctp.payouts[id]:''}</span>`).join('')+'</div>';
+  }
   }
   wrap.innerHTML=html;
 }

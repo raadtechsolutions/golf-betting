@@ -161,7 +161,7 @@
     <div id="resultsWrap"><p class="hint">Import a round (or enter scores) and results appear here.</p></div>
   </section>
 
-  <p class="footer-note">All pools zero-sum: what winners collect equals what the group put in. Robin settles directly between players at the $/point rate on point differences. If screenshot import can't start (no internet or a blocked network), scores can always be entered by hand.<br><b>v9</b> — per hole only the difference in variable wins scores (winners net vs losers) · header-fallback import · handicap-dot net scoring</p>
+  <p class="footer-note">All pools zero-sum: what winners collect equals what the group put in. Robin settles directly between players at the $/point rate on point differences. If screenshot import can't start (no internet or a blocked network), scores can always be entered by hand.<br><b>v10</b> — signed Robin points (losing pair goes negative, money = points × $/pt) · header-number gap tolerance · email names</p>
 </main>
 
 <script>
@@ -217,7 +217,11 @@ function computeRobin(round){
         if(V.combined)tallyWin(valid,'combined',wins,false);
         if(V.putts&&valid.every(m=>m.putts!=null))tallyWin(valid,'putts',wins,false);
         const entries=[...wins.entries()].sort((a,b)=>b[1]-a[1]);
-        if(entries.length>=2&&entries[0][1]>entries[1][1])pairPts[entries[0][0]]+=entries[0][1]-entries[1][1];}}
+        if(entries.length>=2&&entries[0][1]>entries[1][1]){
+          const d=entries[0][1]-entries[1][1];
+          pairPts[entries[0][0]]+=d;
+          pairPts[entries[1][0]]-=d;
+        }}}
     seg.pairs.forEach((pair,pi)=>{
       segDetail.pairs.push({pair:[...pair],points:pairPts[pi]});
       for(const pid of pair)pts[pid]+=pairPts[pi];});
@@ -305,7 +309,9 @@ function settleTransfers(totals){
 }
 function computeAll(round){
   const robin=computeRobin(round);
-  const robinPay=robinSettlement(robin.points,round.bets.robinPerPoint,activeIds(round));
+  // Signed zero-sum points: money is simply points x $/point.
+  const robinPay={net:{}};
+  round.players.forEach(p=>{robinPay.net[p.id]=round2((robin.points[p.id]||0)*round.bets.robinPerPoint);});
   const medal=computeMedal(round);
   const ctp=computeCTP(round);
   const total={};
@@ -833,7 +839,7 @@ function repairRange(cells,i0,i1,target){
 function num(t){return /^\d+$/.test(t);}
 function isPuttsL(t){return /^PUTTS$/i.test(t);}
 function isDrivingL(t){return /^DR.{0,4}ING\|?$/i.test(t)||/^DRIVING$/i.test(t);}
-function isGirL(t){return /^GIR/i.test(t);}
+function isGirL(t){const s=String(t).replace(/[^A-Za-z%]/g,'').toUpperCase();return s.startsWith('GIR')||(s.endsWith('R%')&&s.length<=4);}
 function isPenL(t){return /^PENALT/i.test(t);}
 function reconcile(r){
   const okT=r.out!=null&&r.inn!=null&&r.total===r.out+r.inn;
@@ -853,7 +859,7 @@ function reconcile(r){
   if(r.total!=null&&r.inn!=null&&r.out==null)r.out=r.total-r.inn;
 }
 function parseAnchorsFromWords(words,fallback){
-  const holeWord=words.find(w=>/^HOLE$/i.test(w.text));
+  const holeWord=words.find(w=>/HOLE$/i.test(w.text));
   const outAny=words.find(w=>/^out$/i.test(w.text));
   if(!holeWord&&!outAny){
     if(fallback)return parseRowsWithFallback(words,fallback);
@@ -868,18 +874,30 @@ function parseAnchorsFromWords(words,fallback){
   const netW=words.find(w=>/^NET$/i.test(w.text));
   if(!outW)throw new Error('Couldn\'t find the OUT column in the screenshot.');
   let cols=headerRow.filter(w=>num(w.text)).map(w=>({n:parseInt(w.text),x:w.x})).sort((a,b)=>a.x-b.x);
-  const front=cols.filter(c=>c.x<outW.x);
-  const back=cols.filter(c=>c.x>outW.x&&(!inW||c.x<inW.x));
+  const front=cols.filter(c=>c.n>=1&&c.n<=9&&c.x<outW.x);
+  const back=cols.filter(c=>(c.n===0||(c.n>=10&&c.n<=18))&&c.x>outW.x&&(!inW||c.x<inW.x)).map(c=>({n:c.n===0?10:c.n,x:c.x}));
   if(front.length<2)throw new Error('Couldn\'t locate the hole columns.');
-  const pitchF=(front[front.length-1].x-front[0].x)/(front.length-1);
-  const holeCols=[];
-  for(let i=0;i<9;i++)holeCols.push(front[0].x+pitchF*i);
-  let pitchB=pitchF;
-  if(back.length>1){
-    pitchB=(back[back.length-1].x-back[0].x)/(back.length-1);
-    for(let i=0;i<9;i++)holeCols.push(back[0].x+pitchB*i);
+  // fit columns by hole-number VALUE so a misread header number (e.g. 11 -> "M1") just interpolates
+  const fitRange=(toks,n0,n1,perDefault)=>{
+    toks=toks.filter((t,i,arr)=>arr.findIndex(u=>u.n===t.n)===i).sort((a,b)=>a.n-b.n);
+    const span=toks[toks.length-1].n-toks[0].n;
+    const per=span>0?(toks[toks.length-1].x-toks[0].x)/span:perDefault;
+    const out=[];
+    for(let n=n0;n<=n1;n++){
+      const t=toks.find(t=>t.n===n);
+      out.push(t?t.x:toks[0].x+per*(n-toks[0].n));
+    }
+    return{cols:out,per};
+  };
+  const F=fitRange(front,1,9,null);
+  const holeCols=[...F.cols];
+  let pitchB=F.per;
+  if(back.length>=1){
+    const B=fitRange(back,10,18,F.per);
+    holeCols.push(...B.cols);
+    pitchB=B.per;
   }
-  const pitch=(pitchF+pitchB)/2;
+  const pitch=(F.per+pitchB)/2;
 
   const parW=words.find(w=>/^PAR$/i.test(w.text));
   if(!parW)throw new Error('Couldn\'t find the PAR row.');
@@ -920,8 +938,10 @@ function parseAnchorsFromWords(words,fallback){
       if(!ws.length)ws=L.words;
       const len=ws.reduce((s,w)=>s+w.text.length,0);
       if(len>bestLen){bestLen=len;nameWords=ws.sort((a,b)=>a.x-b.x);}}
+    let nm=nameWords.map(w=>w.text).join(' ');
+    if(!nm)nm=emailName(words,holeCols[0],c.y);
     const r={
-      name:nameWords.map(w=>w.text).join(' ')||'Player',
+      name:nm||'Player',
       y:c.y,
       out:grabIn(c.words,outW),inn:grabIn(c.words,inW),total:grabIn(c.words,totalW),
       hcp:grabIn(c.words,hcpW),net:grabIn(c.words,netW),
@@ -966,7 +986,9 @@ function parseRowsWithFallback(words,fb){
       if(!ws.length)ws=L.words;
       const len=ws.reduce((s,w)=>s+w.text.length,0);
       if(len>bestLen){bestLen=len;nameWords=ws.sort((a,b)=>a.x-b.x);}}
-    const r={name:nameWords.map(w=>w.text).join(' ')||'Player',y:c.y,
+    let nm=nameWords.map(w=>w.text).join(' ');
+    if(!nm)nm=emailName(words,holeCols[0],c.y);
+    const r={name:nm||'Player',y:c.y,
       out:grabIn(c.words,sumX.out),inn:grabIn(c.words,sumX.inn),total:grabIn(c.words,sumX.total),
       hcp:grabIn(c.words,sumX.hcp),net:grabIn(c.words,sumX.net)};
     reconcile(r);
@@ -979,6 +1001,15 @@ function parseRowsWithFallback(words,fb){
     else if(isGirL2(lab.text))owner.girY=lab.y;}
   if(!playerRows.length)throw new Error('No player rows found on this screenshot.');
   return{holeCols,pars:fb.pars,playerRows,pitch,sumX};
+}
+// Last-resort name: a token like "Phil123@Gmail.Com" -> "Phil"
+function emailName(words,leftEdge,rowY){
+  const cand=words.filter(w=>w.x<leftEdge-40&&w.y>rowY-80&&w.y<rowY+40);
+  for(const w of cand){
+    const m=w.text.match(/^[A-Za-zÀ-ÿ]{2,}/);
+    if(m&&!isPuttsL(m[0])&&!isDrivingL(m[0])&&!isGirL(m[0])&&!isPenL(m[0])&&!/^(PAR|HOLE)$/i.test(m[0]))return m[0];
+  }
+  return '';
 }
 function extractWords(data){
   const words=[];
@@ -1136,7 +1167,7 @@ function applyImport(results){
       (row.girIcons||[]).forEach((ic,i)=>{if(ic!=null)p.gir[i]=(ic==='green');});
       if(row.dots&&row.cells&&row.cells.some(c=>c.value!=null)){
         p.dots=p.dots||Array(nHoles).fill(null);
-        row.dots.forEach((d,i)=>{if(row.cells[i]&&row.cells[i].value!=null)p.dots[i]=d;});
+        row.dots.forEach((d,i)=>{p.dots[i]=d;});
       }
     }
   }

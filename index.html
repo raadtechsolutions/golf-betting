@@ -140,7 +140,7 @@
 
   <section class="card">
     <h2 style="display:flex;justify-content:space-between;align-items:center">3 · Scorecard <button class="ghost small" id="scToggle" onclick="toggleScorecard()">Hide</button></h2>
-    <p class="hint">The import fills this in and verifies it against the card's own totals — it stays tucked away unless something needs a look. Anything the reader wasn't sure about is <b style="background:var(--amber-bg);padding:0 4px;border-radius:4px">highlighted</b> for a quick check. <b>S</b>&nbsp;strokes · <b>P</b>&nbsp;putts · <b>FW</b>&nbsp;fairway · <b>GR</b>&nbsp;green in regulation.</p>
+    <p class="hint">The import fills this in and verifies it against the card's own totals — it stays tucked away unless something needs a look. Anything the reader wasn't sure about is <b style="background:var(--amber-bg);padding:0 4px;border-radius:4px">highlighted</b> for a quick check. <b>S</b>&nbsp;strokes · <b>•</b>&nbsp;handicap strokes on the hole (the dots — subtracted for Robin low ball &amp; sum) · <b>P</b>&nbsp;putts · <b>FW</b>&nbsp;fairway · <b>GR</b>&nbsp;green in regulation.</p>
     <div class="scroll" id="scorecardWrap"></div>
   </section>
 
@@ -161,7 +161,7 @@
     <div id="resultsWrap"><p class="hint">Import a round (or enter scores) and results appear here.</p></div>
   </section>
 
-  <p class="footer-note">All pools zero-sum: what winners collect equals what the group put in. Robin settles directly between players at the $/point rate on point differences. If screenshot import can't start (no internet or a blocked network), scores can always be entered by hand.<br><b>v5</b> — Robin: all variables head-to-head per hole (most fairways/greens wins, ties push) · settle-up with fewest payments</p>
+  <p class="footer-note">All pools zero-sum: what winners collect equals what the group put in. Robin settles directly between players at the $/point rate on point differences. If screenshot import can't start (no internet or a blocked network), scores can always be entered by hand.<br><b>v6</b> — handicap dots read from the card &amp; applied to Robin low ball/sum · head-to-head variables · fewest-payment settle-up</p>
 </main>
 
 <script>
@@ -204,8 +204,8 @@ function computeRobin(round){
           return{pi,valid:true,
             fir:isPar3?null:ss.filter(s=>s.fir).length,
             gir:ss.filter(s=>s.gir).length,
-            low:Math.min(...ss.map(s=>s.strokes)),
-            combined:sum(ss.map(s=>s.strokes)),
+            low:Math.min(...ss.map(s=>s.strokes-(s.dots||0))),
+            combined:sum(ss.map(s=>s.strokes-(s.dots||0))),
             putts:ss.every(s=>s.putts!=null)?sum(ss.map(s=>s.putts)):null};});
         const valid=metrics.filter(m=>m.valid);
         if(valid.length<2)continue;
@@ -348,8 +348,8 @@ function freshState(){
 }
 function ensureScores(){
   state.players.forEach(p=>{
-    if(!state.scores[p.id]) state.scores[p.id]=state.holes.map(()=>({strokes:null,putts:null,fir:false,gir:false}));
-    while(state.scores[p.id].length<state.holes.length) state.scores[p.id].push({strokes:null,putts:null,fir:false,gir:false});
+    if(!state.scores[p.id]) state.scores[p.id]=state.holes.map(()=>({strokes:null,putts:null,dots:0,fir:false,gir:false}));
+    while(state.scores[p.id].length<state.holes.length) state.scores[p.id].push({strokes:null,putts:null,dots:0,fir:false,gir:false});
   });
   Object.keys(state.scores).forEach(id=>{
     if(!state.players.find(p=>p.id===id)) delete state.scores[id];
@@ -447,9 +447,9 @@ function renderScorecard(){
   }
   if(btn)btn.textContent='Hide';
   let html='<table><thead><tr><th rowspan="2">Hole</th><th rowspan="2">Par</th>';
-  state.players.forEach(p=>{html+=`<th colspan="4">${esc(p.name)}</th>`;});
+  state.players.forEach(p=>{html+=`<th colspan="5">${esc(p.name)}</th>`;});
   html+='</tr><tr>';
-  state.players.forEach(()=>{html+='<th>S</th><th>P</th><th>FW</th><th>GR</th>';});
+  state.players.forEach(()=>{html+='<th>S</th><th title="Handicap strokes on this hole (dots)">•</th><th>P</th><th>FW</th><th>GR</th>';});
   html+='</tr></thead><tbody>';
   state.holes.forEach((h,hi)=>{
     html+=`<tr><td class="holecell">${h.number}</td>
@@ -458,6 +458,7 @@ function renderScorecard(){
       const s=state.scores[p.id][hi];
       const p3=h.par===3;
       html+=`<td><input class="score-in ${isFlagged(p.id,hi,'strokes')?'flagged':''}" type="number" min="1" value="${s.strokes??''}" onchange="setScore('${p.id}',${hi},'strokes',this.value)"></td>
+        <td><input class="score-in" style="width:34px" type="number" min="0" max="4" value="${s.dots||0}" onchange="setScore('${p.id}',${hi},'dots',this.value)"></td>
         <td><input class="score-in ${isFlagged(p.id,hi,'putts')?'flagged':''}" type="number" min="0" value="${s.putts??''}" onchange="setScore('${p.id}',${hi},'putts',this.value)"></td>
         <td>${p3?'—':`<input class="cb" type="checkbox" ${s.fir?'checked':''} onchange="setScore('${p.id}',${hi},'fir',this.checked)">`}</td>
         <td><input class="cb" type="checkbox" ${s.gir?'checked':''} onchange="setScore('${p.id}',${hi},'gir',this.checked)"></td>`;
@@ -763,6 +764,40 @@ function classifyGlyphs(glyphs){
     digits+=best;
     if(bestScore<minConf)minConf=bestScore;}
   return{value:parseInt(digits),conf:minConf};}
+// Count the handicap-stroke dots in the strip above a score cell (0, 1, 2, ...).
+function countDots(px,W,H,cx,cy,halfW,halfH,pitch){
+  const x0=Math.max(0,Math.round(cx-halfW)),x1=Math.min(W,Math.round(cx+halfW));
+  const y0=Math.max(0,Math.round(cy-halfH)),y1=Math.min(H,Math.round(cy+halfH));
+  const w=x1-x0,h=y1-y0;
+  if(w<3||h<3)return 0;
+  const mask=new Uint8Array(w*h);
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+    const i=((y0+y)*W+(x0+x))*4;
+    if(ilum(px[i],px[i+1],px[i+2])<110)mask[y*w+x]=1;}
+  const label=new Int32Array(w*h).fill(-1);
+  const stack=[];let dots=0;
+  const maxDim=0.16*pitch, minA=Math.max(6,0.003*pitch*pitch), maxA=0.03*pitch*pitch;
+  for(let s=0;s<w*h;s++){
+    if(!mask[s]||label[s]!==-1)continue;
+    stack.length=0;stack.push(s);label[s]=1;
+    let n=0,minX=w,maxX=-1,minY=h,maxY=-1;
+    while(stack.length){
+      const c=stack.pop();
+      const cxx=c%w,cyy=(c/w)|0;
+      n++;
+      if(cxx<minX)minX=cxx;if(cxx>maxX)maxX=cxx;
+      if(cyy<minY)minY=cyy;if(cyy>maxY)maxY=cyy;
+      for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
+        if(!dx&&!dy)continue;
+        const nx=cxx+dx,ny=cyy+dy;
+        if(nx<0||nx>=w||ny<0||ny>=h)continue;
+        const n2=ny*w+nx;
+        if(mask[n2]&&label[n2]===-1){label[n2]=1;stack.push(n2);}}}
+    const bw=maxX-minX+1,bh=maxY-minY+1;
+    if(n>=minA&&n<=maxA&&bw<=maxDim&&bh<=maxDim&&bw/bh>0.45&&bw/bh<2.2)dots++;
+  }
+  return dots;
+}
 function cellIcon(px,W,H,cx,cy,halfW,halfH){
   const x0=Math.max(0,Math.round(cx-halfW)),x1=Math.min(W,Math.round(cx+halfW));
   const y0=Math.max(0,Math.round(cy-halfH)),y1=Math.min(H,Math.round(cy+halfH));
@@ -985,6 +1020,7 @@ async function importImages(files){
         const s18=cells.reduce((a,c)=>a+(c.value||0),0);
         if(cells.some(c=>c.flag)&&row.total!=null&&s18===row.total&&s18>0)cells.forEach(c=>{c.flag=false;});
         row.cells=cells;
+        row.dots=A.holeCols.map(cx=>countDots(px,W,H,cx,row.y-0.57*A.pitch,halfW,0.14*A.pitch,A.pitch));
         if(row.puttsY){
           const pc=A.holeCols.map(cx=>classifyGlyphs(cellGlyphs(px,W,H,cx,row.puttsY,halfW,18)));
           pc.forEach(c=>{if(c.value!=null&&c.value>9){c.value=null;c.flag=true;}});
@@ -1033,6 +1069,10 @@ function applyImport(results){
         if(c.value!=null){p.putts[i]=c.value;if(c.flag)p.flags[i+':putts']=true;else delete p.flags[i+':putts'];}});
       (row.drv||[]).forEach((ic,i)=>{if(ic!=null)p.fir[i]=(ic==='green');});
       (row.girIcons||[]).forEach((ic,i)=>{if(ic!=null)p.gir[i]=(ic==='green');});
+      if(row.dots&&row.cells&&row.cells.some(c=>c.value!=null)){
+        p.dots=p.dots||Array(nHoles).fill(null);
+        row.dots.forEach((d,i)=>{if(row.cells[i]&&row.cells[i].value!=null)p.dots[i]=d;});
+      }
     }
   }
   // build state
@@ -1046,6 +1086,7 @@ function applyImport(results){
     state.scores[pid]=state.holes.map((h,hi)=>({
       strokes:p.scores[hi],
       putts:p.putts[hi],
+      dots:(p.dots&&p.dots[hi])||0,
       fir:h.par===3?null:(p.fir[hi]??false),
       gir:p.gir[hi]??false,
     }));
@@ -1068,10 +1109,13 @@ function applyImport(results){
   if(!anyFir)missing.push('fairways');
   if(!anyGir)missing.push('greens');
   const noStats=players.filter(p=>!p.putts.some(v=>v!=null)&&!p.fir.some(v=>v!=null)&&!p.gir.some(v=>v!=null)).map(p=>p.name);
+  const dotWarns=players.filter(p=>p.hcp!=null&&p.dots&&p.dots.some(d=>d!=null)&&p.dots.reduce((a,d)=>a+(d||0),0)!==p.hcp)
+    .map(p=>`${p.name} (dots ${p.dots.reduce((a,d)=>a+(d||0),0)} vs hcp ${p.hcp})`);
   const status=document.getElementById('importStatus');
   status.innerHTML+=`<br><span class="ok">Round loaded: ${players.length} player${players.length>1?'s':''}, ${nHoles} holes.</span>`+
     (missing.length?` <span class="warn">No ${missing.join('/')} data found — add the expanded Grint stats screenshots to include them in Robin, or those variables stay off.</span>`:'')+
     (!missing.length&&noStats.length?` <span class="warn">No putts/fairways/greens yet for: ${noStats.map(esc).join(', ')} — add their expanded stats screenshots so Robin counts those points for them.</span>`:'')+
+    (dotWarns.length?` <span class="warn">Handicap-stroke dots don't add up for: ${dotWarns.map(esc).join(', ')} — check the • column in the scorecard.</span>`:'')+
     '<br>Next: check any highlighted cells, confirm the Robin pairings (section 4), and pick the closest-to-the-pin winners (section 5).';
 }
 

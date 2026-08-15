@@ -161,7 +161,7 @@
     <div id="resultsWrap"><p class="hint">Import a round (or enter scores) and results appear here.</p></div>
   </section>
 
-  <p class="footer-note">All pools zero-sum: what winners collect equals what the group put in. Robin settles directly between players at the $/point rate on point differences. If screenshot import can't start (no internet or a blocked network), scores can always be entered by hand.<br><b>v4</b> — settle-up with fewest payments · games selector · Grint import</p>
+  <p class="footer-note">All pools zero-sum: what winners collect equals what the group put in. Robin settles directly between players at the $/point rate on point differences. If screenshot import can't start (no internet or a blocked network), scores can always be entered by hand.<br><b>v5</b> — Robin: all variables head-to-head per hole (most fairways/greens wins, ties push) · settle-up with fewest payments</p>
 </main>
 
 <script>
@@ -196,33 +196,34 @@ function computeRobin(round){
     const pairPts=seg.pairs.map(()=>0);
     for(const h of seg.holes){
       const hole=round.holes[h];const isPar3=hole.par===3;
-      seg.pairs.forEach((pair,pi)=>{
-        for(const pid of pair){
-          const s=round.scores[pid]?.[h];
-          if(!s||s.strokes==null)continue;
-          if(V.fir&&!isPar3&&s.fir)pairPts[pi]+=1;
-          if(V.gir&&s.gir)pairPts[pi]+=1;}});
       for(const g of groups){
         const metrics=g.map(pi=>{
           const pair=seg.pairs[pi];
           const ss=pair.map(pid=>round.scores[pid]?.[h]).filter(s=>s&&s.strokes!=null);
           if(ss.length<pair.length)return{pi,valid:false};
           return{pi,valid:true,
+            fir:isPar3?null:ss.filter(s=>s.fir).length,
+            gir:ss.filter(s=>s.gir).length,
             low:Math.min(...ss.map(s=>s.strokes)),
             combined:sum(ss.map(s=>s.strokes)),
             putts:ss.every(s=>s.putts!=null)?sum(ss.map(s=>s.putts)):null};});
         const valid=metrics.filter(m=>m.valid);
         if(valid.length<2)continue;
-        if(V.low)award(valid,'low',pairPts);
-        if(V.combined)award(valid,'combined',pairPts);
-        if(V.putts&&valid.every(m=>m.putts!=null))award(valid,'putts',pairPts);}}
+        if(V.fir&&!isPar3)award(valid,'fir',pairPts,true);
+        if(V.gir)award(valid,'gir',pairPts,true);
+        if(V.low)award(valid,'low',pairPts,false);
+        if(V.combined)award(valid,'combined',pairPts,false);
+        if(V.putts&&valid.every(m=>m.putts!=null))award(valid,'putts',pairPts,false);}}
     seg.pairs.forEach((pair,pi)=>{
       segDetail.pairs.push({pair:[...pair],points:pairPts[pi]});
       for(const pid of pair)pts[pid]+=pairPts[pi];});
     detail.push(segDetail);}
   return{points:pts,detail};
-  function award(valid,key,pairPts){
-    const best=Math.min(...valid.map(m=>m[key]));
+  // Every variable is head-to-head between the pairs on each hole; ties push.
+  // higherBetter: fairways/greens count (more is better); others lower is better.
+  function award(valid,key,pairPts,higherBetter){
+    const vals=valid.map(m=>m[key]);
+    const best=higherBetter?Math.max(...vals):Math.min(...vals);
     const winners=valid.filter(m=>m[key]===best);
     if(winners.length===1)pairPts[winners[0].pi]+=1;}}
 function chunkPairsIntoGroups(nPairs){

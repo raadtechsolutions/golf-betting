@@ -161,7 +161,7 @@
     <div id="resultsWrap"><p class="hint">Import a round (or enter scores) and results appear here.</p></div>
   </section>
 
-  <p class="footer-note">All pools zero-sum: what winners collect equals what the group put in. Robin settles directly between players at the $/point rate on point differences. If screenshot import can't start (no internet or a blocked network), scores can always be entered by hand.<br><b>v6</b> — handicap dots read from the card &amp; applied to Robin low ball/sum · head-to-head variables · fewest-payment settle-up</p>
+  <p class="footer-note">All pools zero-sum: what winners collect equals what the group put in. Robin settles directly between players at the $/point rate on point differences. If screenshot import can't start (no internet or a blocked network), scores can always be entered by hand.<br><b>v7</b> — fairway/green points only count when the stats are known for all players on the hole · handicap-dot net scoring · fewest-payment settle-up</p>
 </main>
 
 <script>
@@ -202,15 +202,15 @@ function computeRobin(round){
           const ss=pair.map(pid=>round.scores[pid]?.[h]).filter(s=>s&&s.strokes!=null);
           if(ss.length<pair.length)return{pi,valid:false};
           return{pi,valid:true,
-            fir:isPar3?null:ss.filter(s=>s.fir).length,
-            gir:ss.filter(s=>s.gir).length,
+            fir:(isPar3||ss.some(s=>s.fir==null))?null:ss.filter(s=>s.fir).length,
+            gir:ss.some(s=>s.gir==null)?null:ss.filter(s=>s.gir).length,
             low:Math.min(...ss.map(s=>s.strokes-(s.dots||0))),
             combined:sum(ss.map(s=>s.strokes-(s.dots||0))),
             putts:ss.every(s=>s.putts!=null)?sum(ss.map(s=>s.putts)):null};});
         const valid=metrics.filter(m=>m.valid);
         if(valid.length<2)continue;
-        if(V.fir&&!isPar3)award(valid,'fir',pairPts,true);
-        if(V.gir)award(valid,'gir',pairPts,true);
+        if(V.fir&&!isPar3&&valid.every(m=>m.fir!=null))award(valid,'fir',pairPts,true);
+        if(V.gir&&valid.every(m=>m.gir!=null))award(valid,'gir',pairPts,true);
         if(V.low)award(valid,'low',pairPts,false);
         if(V.combined)award(valid,'combined',pairPts,false);
         if(V.putts&&valid.every(m=>m.putts!=null))award(valid,'putts',pairPts,false);}}
@@ -1087,8 +1087,8 @@ function applyImport(results){
       strokes:p.scores[hi],
       putts:p.putts[hi],
       dots:(p.dots&&p.dots[hi])||0,
-      fir:h.par===3?null:(p.fir[hi]??false),
-      gir:p.gir[hi]??false,
+      fir:h.par===3?null:(p.fir[hi]??null),
+      gir:p.gir[hi]??null,
     }));
     state.flags[pid]={};
     Object.keys(p.flags).forEach(k=>{state.flags[pid][k]=true;});

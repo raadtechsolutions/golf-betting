@@ -161,7 +161,7 @@
     <div id="resultsWrap"><p class="hint">Import a round (or enter scores) and results appear here.</p></div>
   </section>
 
-  <p class="footer-note">All pools zero-sum: what winners collect equals what the group put in. Robin settles directly between players at the $/point rate on point differences. If screenshot import can't start (no internet or a blocked network), scores can always be entered by hand.</p>
+  <p class="footer-note">All pools zero-sum: what winners collect equals what the group put in. Robin settles directly between players at the $/point rate on point differences. If screenshot import can't start (no internet or a blocked network), scores can always be entered by hand.<br><b>v4</b> — settle-up with fewest payments · games selector · Grint import</p>
 </main>
 
 <script>
@@ -278,6 +278,25 @@ function computeCTP(round){
   const net={};
   round.players.forEach(p=>{net[p.id]=act.includes(p.id)?round2((payouts[p.id]||0)-round.bets.ctpPerPlayer):0;});
   return{wins,pool,payouts,net,par3Count:par3s.length};}
+// Minimal-transfer settlement from net totals: greedy largest-debtor -> largest-creditor.
+function settleTransfers(totals){
+  const creditors=[],debtors=[];
+  for(const[id,v]of Object.entries(totals)){
+    const c=Math.round(v*100);
+    if(c>0)creditors.push({id,c});else if(c<0)debtors.push({id,c:-c});
+  }
+  creditors.sort((a,b)=>b.c-a.c);debtors.sort((a,b)=>b.c-a.c);
+  const transfers=[];
+  let i=0,j=0;
+  while(i<debtors.length&&j<creditors.length){
+    const amt=Math.min(debtors[i].c,creditors[j].c);
+    if(amt>0)transfers.push({from:debtors[i].id,to:creditors[j].id,amount:amt/100});
+    debtors[i].c-=amt;creditors[j].c-=amt;
+    if(debtors[i].c===0)i++;
+    if(creditors[j].c===0)j++;
+  }
+  return transfers;
+}
 function computeAll(round){
   const robin=computeRobin(round);
   const robinPay=robinSettlement(robin.points,round.bets.robinPerPoint,activeIds(round));
@@ -514,6 +533,13 @@ function renderResults(){
   });
   html+='</tbody></table>';
 
+  const transfers=settleTransfers(gTotal);
+  if(transfers.length){
+    html+='<h3>💸 Settle up (fewest payments, all games combined)</h3><ul class="settle">';
+    transfers.forEach(t=>{html+=`<li>${esc(pname(t.from))} pays ${esc(pname(t.to))} <b>$${t.amount}</b></li>`;});
+    html+='</ul>';
+  }
+
   if(G.medal){
   html+=`<h3>🏌️ Medal — pool $${r.medal.pool}</h3><table><thead><tr><th style="text-align:left">Player</th><th>Gross</th><th>Hcp</th><th>Net</th><th>Place</th><th>Wins</th></tr></thead><tbody>`;
   const medalRank=Object.fromEntries(r.medal.ranked.map(x=>[x.id,x]));
@@ -536,11 +562,6 @@ function renderResults(){
     const first=state.holes[seg.holes[0]].number,last=state.holes[seg.holes[seg.holes.length-1]].number;
     html+=`<p class="hint" style="margin:8px 0 0">Holes ${first}–${last}: `+seg.pairs.map(pp=>`${esc(pname(pp.pair[0]))} & ${esc(pname(pp.pair[1]))} → ${pp.points} pts`).join(' · ')+'</p>';
   });
-  if(r.robinPay.matrix.length){
-    html+='<h3 style="font-size:13px">Robin settlement</h3><ul class="settle">';
-    r.robinPay.matrix.forEach(m=>{html+=`<li>${esc(pname(m.from))} pays ${esc(pname(m.to))} <b>$${m.amount}</b></li>`;});
-    html+='</ul>';
-  }
   }
 
   if(G.ctp){

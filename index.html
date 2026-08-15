@@ -161,7 +161,7 @@
     <div id="resultsWrap"><p class="hint">Import a round (or enter scores) and results appear here.</p></div>
   </section>
 
-  <p class="footer-note">All pools zero-sum: what winners collect equals what the group put in. Robin settles directly between players at the $/point rate on point differences. If screenshot import can't start (no internet or a blocked network), scores can always be entered by hand.<br><b>v7</b> — fairway/green points only count when the stats are known for all players on the hole · handicap-dot net scoring · fewest-payment settle-up</p>
+  <p class="footer-note">All pools zero-sum: what winners collect equals what the group put in. Robin settles directly between players at the $/point rate on point differences. If screenshot import can't start (no internet or a blocked network), scores can always be entered by hand.<br><b>v9</b> — per hole only the difference in variable wins scores (winners net vs losers) · header-fallback import · handicap-dot net scoring</p>
 </main>
 
 <script>
@@ -209,11 +209,15 @@ function computeRobin(round){
             putts:ss.every(s=>s.putts!=null)?sum(ss.map(s=>s.putts)):null};});
         const valid=metrics.filter(m=>m.valid);
         if(valid.length<2)continue;
-        if(V.fir&&!isPar3&&valid.every(m=>m.fir!=null))award(valid,'fir',pairPts,true);
-        if(V.gir&&valid.every(m=>m.gir!=null))award(valid,'gir',pairPts,true);
-        if(V.low)award(valid,'low',pairPts,false);
-        if(V.combined)award(valid,'combined',pairPts,false);
-        if(V.putts&&valid.every(m=>m.putts!=null))award(valid,'putts',pairPts,false);}}
+        // count variable wins per pair on this hole, then award only the DIFFERENCE to the leading pair
+        const wins=new Map();valid.forEach(m=>wins.set(m.pi,0));
+        if(V.fir&&!isPar3&&valid.every(m=>m.fir!=null))tallyWin(valid,'fir',wins,true);
+        if(V.gir&&valid.every(m=>m.gir!=null))tallyWin(valid,'gir',wins,true);
+        if(V.low)tallyWin(valid,'low',wins,false);
+        if(V.combined)tallyWin(valid,'combined',wins,false);
+        if(V.putts&&valid.every(m=>m.putts!=null))tallyWin(valid,'putts',wins,false);
+        const entries=[...wins.entries()].sort((a,b)=>b[1]-a[1]);
+        if(entries.length>=2&&entries[0][1]>entries[1][1])pairPts[entries[0][0]]+=entries[0][1]-entries[1][1];}}
     seg.pairs.forEach((pair,pi)=>{
       segDetail.pairs.push({pair:[...pair],points:pairPts[pi]});
       for(const pid of pair)pts[pid]+=pairPts[pi];});
@@ -221,11 +225,12 @@ function computeRobin(round){
   return{points:pts,detail};
   // Every variable is head-to-head between the pairs on each hole; ties push.
   // higherBetter: fairways/greens count (more is better); others lower is better.
-  function award(valid,key,pairPts,higherBetter){
+  // Per hole, each pair's variable wins are tallied and only the net difference scores.
+  function tallyWin(valid,key,wins,higherBetter){
     const vals=valid.map(m=>m[key]);
     const best=higherBetter?Math.max(...vals):Math.min(...vals);
     const winners=valid.filter(m=>m[key]===best);
-    if(winners.length===1)pairPts[winners[0].pi]+=1;}}
+    if(winners.length===1)wins.set(winners[0].pi,wins.get(winners[0].pi)+1);}}
 function chunkPairsIntoGroups(nPairs){
   const groups=[];
   for(let i=0;i<nPairs;i+=2){groups.push(i+1<nPairs?[i,i+1]:[i]);}
@@ -847,10 +852,13 @@ function reconcile(r){
   if(r.total!=null&&r.out!=null&&r.inn==null)r.inn=r.total-r.out;
   if(r.total!=null&&r.inn!=null&&r.out==null)r.out=r.total-r.inn;
 }
-function parseAnchorsFromWords(words){
+function parseAnchorsFromWords(words,fallback){
   const holeWord=words.find(w=>/^HOLE$/i.test(w.text));
   const outAny=words.find(w=>/^out$/i.test(w.text));
-  if(!holeWord&&!outAny)throw new Error('This doesn\'t look like a Grint scorecard (no HOLE/OUT header found).');
+  if(!holeWord&&!outAny){
+    if(fallback)return parseRowsWithFallback(words,fallback);
+    throw new Error('This doesn\'t look like a Grint scorecard (no HOLE/OUT header found). If it\'s scrolled past the header, upload it together with a screenshot that shows the HOLE/PAR row.');
+  }
   const headerY=(holeWord||outAny).y;
   const headerRow=words.filter(w=>Math.abs(w.y-headerY)<15);
   const outW=headerRow.find(w=>/out/i.test(w.text));
@@ -931,6 +939,47 @@ function parseAnchorsFromWords(words){
   const sumX={out:outW&&outW.x,inn:inW&&inW.x,total:totalW&&totalW.x,hcp:hcpW&&hcpW.x,net:netW&&netW.x};
   return{holeCols,pars,playerRows,pitch,sumX};
 }
+// A screenshot scrolled past the header: reuse hole columns / summary columns from a sibling image.
+function parseRowsWithFallback(words,fb){
+  const holeCols=fb.holeCols,pitch=fb.pitch,sumX=fb.sumX;
+  const isPuttsL2=isPuttsL,isDrivingL2=isDrivingL,isGirL2=isGirL,isPenL2=isPenL;
+  const statLabels=words.filter(w=>(isPuttsL2(w.text)||isDrivingL2(w.text)||isGirL2(w.text)||isPenL2(w.text))&&w.x<holeCols[0]);
+  const isStatY=y=>statLabels.some(l=>Math.abs(l.y-y)<25);
+  const anchors=[['out',sumX.out],['inn',sumX.inn],['total',sumX.total],['hcp',sumX.hcp],['net',sumX.net]].filter(a=>a[1]!=null);
+  const colVals=words.filter(w=>num(w.text)&&!isStatY(w.y)&&anchors.some(a=>Math.abs(w.x-a[1])<50));
+  const clusters=[];
+  for(const w of [...colVals].sort((a,b)=>a.y-b.y)){
+    const c=clusters.find(c=>Math.abs(c.y-w.y)<25);
+    if(c){c.words.push(w);c.y=c.words.reduce((s,x)=>s+x.y,0)/c.words.length;}
+    else clusters.push({y:w.y,words:[w]});}
+  const grabIn=(list,ax)=>{const c=list.filter(w=>Math.abs(w.x-ax)<50)[0];return c?parseInt(c.text):null;};
+  const grab=(rowY,ax)=>{if(ax==null)return null;const c=words.filter(w=>num(w.text)&&Math.abs(w.x-ax)<50&&Math.abs(w.y-rowY)<30)[0];return c?parseInt(c.text):null;};
+  const playerRows=clusters.filter(c=>c.words.length>=2).map(c=>{
+    const cand=words.filter(w=>w.x<holeCols[0]-40&&w.y>c.y-80&&w.y<c.y+40&&/^[A-Za-zÀ-ÿ'.-]{2,}$/.test(w.text)&&!isPuttsL2(w.text)&&!isDrivingL2(w.text)&&!isGirL2(w.text)&&!isPenL2(w.text)&&!/^(PAR|HOLE)$/i.test(w.text));
+    const lines=[];
+    for(const w of [...cand].sort((a,b)=>a.y-b.y)){
+      const L=lines.find(L=>Math.abs(L.y-w.y)<12);
+      if(L){L.words.push(w);L.y=(L.y+w.y)/2;}else lines.push({y:w.y,words:[w]});}
+    let nameWords=[];let bestLen=0;
+    for(const L of lines){
+      let ws=L.words.filter(w=>w.text.length>=3);
+      if(!ws.length)ws=L.words;
+      const len=ws.reduce((s,w)=>s+w.text.length,0);
+      if(len>bestLen){bestLen=len;nameWords=ws.sort((a,b)=>a.x-b.x);}}
+    const r={name:nameWords.map(w=>w.text).join(' ')||'Player',y:c.y,
+      out:grabIn(c.words,sumX.out),inn:grabIn(c.words,sumX.inn),total:grabIn(c.words,sumX.total),
+      hcp:grabIn(c.words,sumX.hcp),net:grabIn(c.words,sumX.net)};
+    reconcile(r);
+    return r;}).sort((a,b)=>a.y-b.y);
+  for(const lab of statLabels){
+    const owner=[...playerRows].filter(p=>p.y<lab.y&&lab.y-p.y<320).sort((a,b)=>b.y-a.y)[0];
+    if(!owner)continue;
+    if(isPuttsL2(lab.text)){owner.puttsY=lab.y;owner.puttsOut=grab(lab.y,sumX.out);owner.puttsIn=grab(lab.y,sumX.inn);owner.puttsTot=grab(lab.y,sumX.total);}
+    else if(isDrivingL2(lab.text))owner.drivingY=lab.y;
+    else if(isGirL2(lab.text))owner.girY=lab.y;}
+  if(!playerRows.length)throw new Error('No player rows found on this screenshot.');
+  return{holeCols,pars:fb.pars,playerRows,pitch,sumX};
+}
 function extractWords(data){
   const words=[];
   const push=w=>{if(w&&w.bbox)words.push({text:(w.text||'').trim(),x:(w.bbox.x0+w.bbox.x1)/2,y:(w.bbox.y0+w.bbox.y1)/2});};
@@ -985,15 +1034,33 @@ async function importImages(files){
     lines.push(`<span class="err">✕ ${esc(e.message)}</span>`);say();
     return;
   }
+  // stage all images first so headerless (scrolled) shots can borrow layout from a sibling
+  const staged=[];
   for(const file of files){
     lines.push(`Reading <b>${esc(file.name||'pasted image')}</b>…`);say();
     try{
       const canvas=await fileToCanvas(file);
       const ctx=canvas.getContext('2d');
+      const{data}=await worker.recognize(canvas,{},{blocks:true});
+      const words=extractWords(data);
+      staged.push({file,canvas,words,hasHeader:words.some(w=>/^HOLE$/i.test(w.text))||words.some(w=>/^out$/i.test(w.text))});
+      lines.pop();
+    }catch(e){
+      lines.pop();
+      lines.push(`<span class="err">✕ ${esc(file.name||'pasted image')}: ${esc(e.message)}</span>`);say();
+    }
+  }
+  staged.sort((a,b)=>(b.hasHeader?1:0)-(a.hasHeader?1:0));
+  let fbAnchors=null,fbW=null;
+  for(const s of staged){
+    const file=s.file;
+    try{
+      const canvas=s.canvas;
+      const ctx=canvas.getContext('2d');
       const px=ctx.getImageData(0,0,canvas.width,canvas.height).data;
       const W=canvas.width,H=canvas.height;
-      const{data}=await worker.recognize(canvas,{},{blocks:true});
-      const A=parseAnchorsFromWords(extractWords(data));
+      const A=parseAnchorsFromWords(s.words,(fbW===W)?fbAnchors:null);
+      if(s.hasHeader&&!fbAnchors){fbAnchors=A;fbW=W;}
       const halfW=A.pitch*0.36;
       // re-read summary columns with the glyph classifier (more reliable than word OCR)
       const readSum=(x,y)=>{
@@ -1036,11 +1103,9 @@ async function importImages(files){
       imported.push(A);
       const names=A.playerRows.map(r=>r.name).join(', ');
       const flags=A.playerRows.reduce((n,r)=>n+(r.cells||[]).filter(c=>c.flag).length+(r.puttCells||[]).filter(c=>c.flag).length,0);
-      lines.pop();
       lines.push(`<span class="ok">✓ ${esc(file.name||'pasted image')}</span> — ${esc(names)}${flags?` <span class="warn">(${flags} cell${flags>1?'s':''} to double-check)</span>`:''}`);
       say();
     }catch(e){
-      lines.pop();
       lines.push(`<span class="err">✕ ${esc(file.name||'pasted image')}: ${esc(e.message)}</span>`);say();
     }
   }

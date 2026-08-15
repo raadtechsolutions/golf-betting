@@ -1,0 +1,1031 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Golf Betting — Robin · Medal · Closest to the Pin</title>
+<style>
+  :root {
+    --green-900:#14351f; --green-800:#1d4a2c; --green-700:#276b3d; --green-600:#2f8049;
+    --green-100:#e7f2ea; --green-50:#f3f8f4;
+    --sand:#f7f4ec; --ink:#1c2620; --ink-soft:#5b6b60; --line:#dde6df;
+    --red:#b3402f; --amber:#8a6d1a; --amber-bg:#fdf3d7; --card:#ffffff; --radius:14px;
+  }
+  * { box-sizing:border-box; }
+  body {
+    margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:var(--green-50); color:var(--ink); font-size:15px; line-height:1.45;
+  }
+  header { background:linear-gradient(135deg,var(--green-900),var(--green-700)); color:#fff; padding:20px 20px 16px; }
+  header h1 { margin:0; font-size:20px; font-weight:700; letter-spacing:.2px; }
+  header p { margin:4px 0 0; opacity:.85; font-size:13px; }
+  main { max-width:1080px; margin:0 auto; padding:16px 14px 60px; }
+  section.card { background:var(--card); border:1px solid var(--line); border-radius:var(--radius); padding:16px; margin-top:16px; box-shadow:0 1px 2px rgba(20,53,31,.04); }
+  h2 { font-size:15px; margin:0 0 10px; color:var(--green-800); text-transform:uppercase; letter-spacing:.6px; }
+  h3 { font-size:14px; margin:14px 0 6px; color:var(--ink); }
+  .hint { color:var(--ink-soft); font-size:12.5px; margin:2px 0 10px; }
+  label { font-size:12.5px; color:var(--ink-soft); display:block; margin-bottom:2px; }
+  input[type=text], input[type=number], select {
+    border:1px solid var(--line); border-radius:8px; padding:6px 8px; font-size:14px; background:#fff; color:var(--ink); width:100%;
+  }
+  input:focus, select:focus { outline:2px solid var(--green-600); outline-offset:0; border-color:var(--green-600); }
+  button { background:var(--green-700); color:#fff; border:none; border-radius:9px; padding:8px 14px; font-size:14px; font-weight:600; cursor:pointer; }
+  button:hover { background:var(--green-600); }
+  button.ghost { background:transparent; color:var(--green-700); border:1.5px solid var(--green-700); }
+  button.ghost:hover { background:var(--green-100); }
+  button.small { padding:4px 10px; font-size:12.5px; border-radius:7px; }
+  .row { display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; }
+  .row > div { flex:1 1 120px; min-width:100px; }
+  table { border-collapse:collapse; width:100%; font-size:13.5px; }
+  th, td { border:1px solid var(--line); padding:4px 6px; text-align:center; }
+  th { background:var(--green-100); color:var(--green-900); font-weight:600; font-size:12.5px; }
+  .scroll { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+  input.score-in { width:44px; min-width:34px; text-align:center; padding:4px 2px; appearance:textfield; -moz-appearance:textfield; }
+  input.score-in::-webkit-outer-spin-button, input.score-in::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
+  input.flagged { background:var(--amber-bg); border-color:var(--amber); }
+  .cb { width:16px; height:16px; accent-color:var(--green-700); }
+  td.holecell { background:var(--sand); font-weight:700; }
+  .player-grid { display:grid; grid-template-columns:auto 1fr 90px 34px; gap:8px 10px; align-items:center; }
+  .player-grid .head { font-size:12px; color:var(--ink-soft); }
+  .del { background:transparent; border:none; color:var(--red); font-size:16px; cursor:pointer; padding:2px 6px; }
+  .pill { display:inline-block; background:var(--green-100); color:var(--green-900); border-radius:999px; padding:2px 10px; font-size:12.5px; font-weight:600; margin:2px 4px 2px 0; }
+  .pill.warn { background:var(--amber-bg); color:var(--amber); }
+  .money-pos { color:var(--green-700); font-weight:700; }
+  .money-neg { color:var(--red); font-weight:700; }
+  .totals-table td { padding:7px 8px; font-size:14px; }
+  .totals-table td:first-child { text-align:left; font-weight:600; }
+  .settle li { margin:3px 0; }
+  .seg { border:1px dashed var(--line); border-radius:10px; padding:10px; margin-top:8px; }
+  .seg-title { font-weight:700; font-size:13px; color:var(--green-800); margin-bottom:6px; }
+  .pairline { display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin:4px 0; }
+  .pairline select { width:auto; min-width:110px; }
+  .vs { font-size:12px; color:var(--ink-soft); font-weight:700; }
+  .bar { display:flex; gap:10px; flex-wrap:wrap; margin-top:12px; }
+  .footer-note { color:var(--ink-soft); font-size:12px; margin-top:24px; }
+  .winner { background:#fff8e1; }
+  .drop {
+    border:2px dashed var(--green-600); border-radius:12px; padding:22px; text-align:center;
+    color:var(--green-800); background:var(--green-50); cursor:pointer; transition:background .15s;
+  }
+  .drop.over { background:var(--green-100); }
+  .drop b { display:block; font-size:15px; margin-bottom:4px; }
+  .drop span { font-size:12.5px; color:var(--ink-soft); }
+  #importStatus { margin-top:10px; font-size:13px; }
+  #importStatus .ok { color:var(--green-700); font-weight:600; }
+  #importStatus .warn { color:var(--amber); font-weight:600; }
+  #importStatus .err { color:var(--red); font-weight:600; }
+  .togglerow { display:flex; gap:14px; flex-wrap:wrap; margin:6px 0 2px; }
+  .togglerow label { display:flex; align-items:center; gap:5px; font-size:13px; color:var(--ink); margin:0; cursor:pointer; }
+  @media (max-width:640px){ body{font-size:14px;} input.score-in{width:38px;} }
+</style>
+</head>
+<body>
+<header>
+  <h1>⛳ Golf Betting</h1>
+  <p>Drop your Grint screenshots — the app reads them and does the money math.</p>
+</header>
+<main>
+
+  <section class="card">
+    <h2>1 · Import from Grint</h2>
+    <div class="drop" id="dropZone">
+      <b>Drop Grint screenshots here — or click to choose</b>
+      <span>Scorecard view and/or the expanded stats view (putts · driving · GIR). Add as many screenshots as needed to cover all players; they merge into one round. You can also paste (⌘V) a screenshot.</span>
+    </div>
+    <input type="file" id="fileInput" accept="image/*" multiple style="display:none">
+    <div id="importStatus"></div>
+  </section>
+
+  <section class="card" id="setup">
+    <h2>2 · Round setup</h2>
+    <div class="row">
+      <div style="flex:2 1 200px"><label>Round name</label><input type="text" id="roundName" value="" placeholder="Saturday game"></div>
+      <div><label>Medal bet / player ($)</label><input type="number" id="betMedal" value="10" min="0" step="1"></div>
+      <div><label>CTP bet / player ($)</label><input type="number" id="betCtp" value="10" min="0" step="1"></div>
+      <div><label>Robin $ / point</label><input type="number" id="betRobin" value="1" min="0" step="0.5"></div>
+    </div>
+    <h3>Players &amp; handicaps</h3>
+    <p class="hint">Filled automatically by the import (handicap from Grint). Robin pairs rotate inside each foursome (players 1–4, 5–8, 9–12…).</p>
+    <div class="player-grid" id="playerGrid"></div>
+    <div class="bar">
+      <button class="ghost small" onclick="addPlayer()">+ Add player</button>
+      <button class="ghost small" onclick="loadSample()">Load sample round</button>
+      <button class="ghost small" onclick="resetAll()">Clear everything</button>
+    </div>
+    <h3>Robin point variables</h3>
+    <p class="hint">Variables missing from the screenshots are switched off automatically.</p>
+    <div class="togglerow">
+      <label><input class="cb" type="checkbox" id="rv-fir" checked onchange="renderResults()"> Fairways</label>
+      <label><input class="cb" type="checkbox" id="rv-gir" checked onchange="renderResults()"> Greens</label>
+      <label><input class="cb" type="checkbox" id="rv-low" checked onchange="renderResults()"> Low ball</label>
+      <label><input class="cb" type="checkbox" id="rv-comb" checked onchange="renderResults()"> Combined score</label>
+      <label><input class="cb" type="checkbox" id="rv-putts" checked onchange="renderResults()"> Putts</label>
+    </div>
+    <h3>Prize split</h3>
+    <p class="hint">Applied to the Medal and CTP pools. Robin settles player-to-player at $/point.</p>
+    <div class="row">
+      <div><label>Places paid (≤8 players)</label><input type="text" id="splitSmall" value="60/40"></div>
+      <div><label>Places paid (9+ players)</label><input type="text" id="splitLarge" value="60/30/10"></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2 style="display:flex;justify-content:space-between;align-items:center">3 · Scorecard <button class="ghost small" id="scToggle" onclick="toggleScorecard()">Hide</button></h2>
+    <p class="hint">The import fills this in and verifies it against the card's own totals — it stays tucked away unless something needs a look. Anything the reader wasn't sure about is <b style="background:var(--amber-bg);padding:0 4px;border-radius:4px">highlighted</b> for a quick check. <b>S</b>&nbsp;strokes · <b>P</b>&nbsp;putts · <b>FW</b>&nbsp;fairway · <b>GR</b>&nbsp;green in regulation.</p>
+    <div class="scroll" id="scorecardWrap"></div>
+  </section>
+
+  <section class="card">
+    <h2>4 · Robin pairings</h2>
+    <p class="hint">Default rotation: 1&2 v 3&4 → 1&3 v 2&4 → 1&4 v 2&3 every six holes. Adjust to match who actually played together.</p>
+    <div id="pairingsWrap"></div>
+  </section>
+
+  <section class="card">
+    <h2>5 · Closest to the pin</h2>
+    <p class="hint">Pick the winner on each par 3 (leave blank if nobody hit the green).</p>
+    <div id="ctpWrap"></div>
+  </section>
+
+  <section class="card">
+    <h2>6 · Results</h2>
+    <div id="resultsWrap"><p class="hint">Import a round (or enter scores) and results appear here.</p></div>
+  </section>
+
+  <p class="footer-note">All pools zero-sum: what winners collect equals what the group put in. Robin settles directly between players at the $/point rate on point differences. If screenshot import can't start (no internet or a blocked network), scores can always be entered by hand.</p>
+</main>
+
+<script>
+/* ===================== ENGINE ===================== */
+function sum(arr){return arr.reduce((a,b)=>a+b,0);}
+function round2(x){return Math.round(x*100)/100;}
+function splitForCount(nPlayers,payoutSplits){const t=payoutSplits.largeThreshold??9;return nPlayers>=t?payoutSplits.large:payoutSplits.small;}
+function rankEntries(entries,lowerIsBetter=true){
+  const sorted=[...entries].sort((a,b)=>lowerIsBetter?a.value-b.value:b.value-a.value);
+  const out=[];let i=0;
+  while(i<sorted.length){let j=i;
+    while(j+1<sorted.length&&sorted[j+1].value===sorted[i].value)j++;
+    for(let k=i;k<=j;k++)out.push({...sorted[k],rank:i+1,tieSize:j-i+1});
+    i=j+1;}
+  return out;}
+function distributePool(pool,ranked,splits){
+  const payouts={};ranked.forEach(r=>{payouts[r.id]=0;});
+  const groups=new Map();
+  ranked.forEach(r=>{if(!groups.has(r.rank))groups.set(r.rank,[]);groups.get(r.rank).push(r.id);});
+  for(const[rank,ids]of groups){
+    const first=rank-1,span=ids.length;let share=0;
+    for(let p=first;p<first+span&&p<splits.length;p++)share+=splits[p];
+    if(share>0){const each=pool*share/span;ids.forEach(id=>{payouts[id]=round2(each);});}}
+  return payouts;}
+function computeRobin(round){
+  const V=round.robinVars||{fir:true,gir:true,low:true,combined:true,putts:true};
+  const pts={};round.players.forEach(p=>{pts[p.id]=0;});
+  const detail=[];
+  for(const seg of round.segments){
+    const segDetail={holes:seg.holes,pairs:[]};
+    const groups=seg.groups&&seg.groups.length?seg.groups:chunkPairsIntoGroups(seg.pairs.length);
+    const pairPts=seg.pairs.map(()=>0);
+    for(const h of seg.holes){
+      const hole=round.holes[h];const isPar3=hole.par===3;
+      seg.pairs.forEach((pair,pi)=>{
+        for(const pid of pair){
+          const s=round.scores[pid]?.[h];
+          if(!s||s.strokes==null)continue;
+          if(V.fir&&!isPar3&&s.fir)pairPts[pi]+=1;
+          if(V.gir&&s.gir)pairPts[pi]+=1;}});
+      for(const g of groups){
+        const metrics=g.map(pi=>{
+          const pair=seg.pairs[pi];
+          const ss=pair.map(pid=>round.scores[pid]?.[h]).filter(s=>s&&s.strokes!=null);
+          if(ss.length<pair.length)return{pi,valid:false};
+          return{pi,valid:true,
+            low:Math.min(...ss.map(s=>s.strokes)),
+            combined:sum(ss.map(s=>s.strokes)),
+            putts:ss.every(s=>s.putts!=null)?sum(ss.map(s=>s.putts)):null};});
+        const valid=metrics.filter(m=>m.valid);
+        if(valid.length<2)continue;
+        if(V.low)award(valid,'low',pairPts);
+        if(V.combined)award(valid,'combined',pairPts);
+        if(V.putts&&valid.every(m=>m.putts!=null))award(valid,'putts',pairPts);}}
+    seg.pairs.forEach((pair,pi)=>{
+      segDetail.pairs.push({pair:[...pair],points:pairPts[pi]});
+      for(const pid of pair)pts[pid]+=pairPts[pi];});
+    detail.push(segDetail);}
+  return{points:pts,detail};
+  function award(valid,key,pairPts){
+    const best=Math.min(...valid.map(m=>m[key]));
+    const winners=valid.filter(m=>m[key]===best);
+    if(winners.length===1)pairPts[winners[0].pi]+=1;}}
+function chunkPairsIntoGroups(nPairs){
+  const groups=[];
+  for(let i=0;i<nPairs;i+=2){groups.push(i+1<nPairs?[i,i+1]:[i]);}
+  return groups;}
+function activeIds(round){
+  return round.players.filter(p=>(round.scores[p.id]||[]).some(s=>s&&s.strokes!=null)).map(p=>p.id);}
+function robinSettlement(points,rate,onlyIds){
+  const ids=onlyIds||Object.keys(points);
+  const net={};ids.forEach(id=>{net[id]=0;});
+  const matrix=[];
+  for(let i=0;i<ids.length;i++){
+    for(let j=i+1;j<ids.length;j++){
+      const a=ids[i],b=ids[j];
+      const diff=(points[a]-points[b])*rate;
+      if(diff>0){matrix.push({from:b,to:a,amount:round2(diff)});}
+      else if(diff<0){matrix.push({from:a,to:b,amount:round2(-diff)});}
+      net[a]=round2(net[a]+diff);net[b]=round2(net[b]-diff);}}
+  return{net,matrix};}
+function computeMedal(round){
+  const entries=round.players.map(p=>{
+    const ss=round.scores[p.id]||[];
+    const played=ss.filter(s=>s&&s.strokes!=null);
+    const gross=sum(played.map(s=>s.strokes));
+    const net=gross-(p.handicap||0);
+    return{id:p.id,gross,net,holesPlayed:played.length};});
+  const active=entries.filter(e=>e.holesPlayed>0);
+  const pool=round.bets.medalPerPlayer*active.length;
+  const ranked=rankEntries(active.map(e=>({id:e.id,value:e.net})),true);
+  const splits=splitForCount(active.length,round.payoutSplits);
+  const payouts=distributePool(pool,ranked,splits);
+  const net={};
+  round.players.forEach(p=>{
+    const played=active.some(e=>e.id===p.id);
+    net[p.id]=played?round2((payouts[p.id]||0)-round.bets.medalPerPlayer):0;});
+  return{entries:active,ranked,pool,payouts,net};}
+function computeCTP(round){
+  const wins={};round.players.forEach(p=>{wins[p.id]=0;});
+  const par3s=round.holes.map((h,i)=>({h,i})).filter(x=>x.h.par===3);
+  for(const{i}of par3s){const w=round.ctpWinners?.[i];if(w!=null&&wins[w]!=null)wins[w]+=1;}
+  const act=activeIds(round);
+  const pool=round.bets.ctpPerPlayer*act.length;
+  const contenders=Object.entries(wins).filter(([,n])=>n>0).map(([id,n])=>({id,value:n}));
+  const splits=splitForCount(act.length,round.payoutSplits);
+  let payouts={};
+  if(contenders.length>0){
+    const ranked=rankEntries(contenders,false);
+    const effSplits=splits.slice(0,contenders.length);
+    const total=sum(effSplits);
+    const normSplits=effSplits.map(s=>s/total);
+    payouts=distributePool(pool,ranked,normSplits);}
+  const net={};
+  round.players.forEach(p=>{net[p.id]=act.includes(p.id)?round2((payouts[p.id]||0)-round.bets.ctpPerPlayer):0;});
+  return{wins,pool,payouts,net,par3Count:par3s.length};}
+function computeAll(round){
+  const robin=computeRobin(round);
+  const robinPay=robinSettlement(robin.points,round.bets.robinPerPoint,activeIds(round));
+  const medal=computeMedal(round);
+  const ctp=computeCTP(round);
+  const total={};
+  round.players.forEach(p=>{total[p.id]=round2((robinPay.net[p.id]||0)+(medal.net[p.id]||0)+(ctp.net[p.id]||0));});
+  return{robin,robinPay,medal,ctp,total};}
+function defaultSegments(playerIds,nHoles){
+  const segHoles=[];
+  const segCount=nHoles>=18?3:(nHoles>=12?2:1);
+  const per=Math.floor(nHoles/segCount);
+  for(let s=0;s<segCount;s++){
+    const start=s*per;const end=s===segCount-1?nHoles:start+per;
+    segHoles.push(Array.from({length:end-start},(_,k)=>start+k));}
+  const rotations=[[[0,1],[2,3]],[[0,2],[1,3]],[[0,3],[1,2]]];
+  return segHoles.map((holes,s)=>{
+    const pairs=[];const groups=[];
+    for(let base=0;base<playerIds.length;base+=4){
+      const grpIds=playerIds.slice(base,base+4);
+      if(grpIds.length<2)break;
+      const rot=rotations[s%3];const gi=[];
+      for(const[x,y]of rot){
+        if(grpIds[x]!=null&&grpIds[y]!=null){pairs.push([grpIds[x],grpIds[y]]);gi.push(pairs.length-1);}}
+      if(gi.length)groups.push(gi);}
+    return{holes,pairs,groups};});}
+
+/* ===================== APP STATE ===================== */
+const DEFAULT_PARS=[4,4,3,4,5,4,3,4,4,4,3,5,4,4,3,4,5,4];
+let state=null;
+let customPairs=false;
+
+function freshState(){
+  return {
+    players:[
+      {id:'p1',name:'Player 1',handicap:0},
+      {id:'p2',name:'Player 2',handicap:0},
+      {id:'p3',name:'Player 3',handicap:0},
+      {id:'p4',name:'Player 4',handicap:0},
+    ],
+    nextId:5,
+    holes:DEFAULT_PARS.map((par,i)=>({number:i+1,par})),
+    scores:{},
+    segments:null,
+    ctpWinners:{},
+    flags:{},
+  };
+}
+function ensureScores(){
+  state.players.forEach(p=>{
+    if(!state.scores[p.id]) state.scores[p.id]=state.holes.map(()=>({strokes:null,putts:null,fir:false,gir:false}));
+    while(state.scores[p.id].length<state.holes.length) state.scores[p.id].push({strokes:null,putts:null,fir:false,gir:false});
+  });
+  Object.keys(state.scores).forEach(id=>{
+    if(!state.players.find(p=>p.id===id)) delete state.scores[id];
+  });
+}
+function ensureSegments(){
+  if(!state.segments||!customPairs){
+    state.segments=defaultSegments(state.players.map(p=>p.id),state.holes.length);
+  }else{
+    state.segments.forEach(seg=>{
+      seg.pairs=seg.pairs.filter(pair=>pair.every(pid=>state.players.find(p=>p.id===pid)));
+      seg.groups=null;
+    });
+  }
+}
+function pname(id){const p=state.players.find(p=>p.id===id);return p?p.name:'?';}
+function parseSplit(txt){
+  const parts=(txt||'').split('/').map(s=>parseFloat(s.trim())).filter(n=>!isNaN(n)&&n>0);
+  if(!parts.length)return null;
+  const tot=parts.reduce((a,b)=>a+b,0);
+  return parts.map(p=>p/tot);
+}
+function getBets(){
+  return {
+    medalPerPlayer:parseFloat(document.getElementById('betMedal').value)||0,
+    ctpPerPlayer:parseFloat(document.getElementById('betCtp').value)||0,
+    robinPerPoint:parseFloat(document.getElementById('betRobin').value)||0,
+  };
+}
+function getSplits(){
+  return {
+    small:parseSplit(document.getElementById('splitSmall').value)||[0.6,0.4],
+    large:parseSplit(document.getElementById('splitLarge').value)||[0.6,0.3,0.1],
+    largeThreshold:9,
+  };
+}
+function getRobinVars(){
+  return {
+    fir:document.getElementById('rv-fir').checked,
+    gir:document.getElementById('rv-gir').checked,
+    low:document.getElementById('rv-low').checked,
+    combined:document.getElementById('rv-comb').checked,
+    putts:document.getElementById('rv-putts').checked,
+  };
+}
+function isFlagged(pid,hi,field){return !!state.flags?.[pid]?.[hi+':'+field];}
+function setFlag(pid,hi,field,on){
+  state.flags[pid]=state.flags[pid]||{};
+  if(on)state.flags[pid][hi+':'+field]=true;else delete state.flags[pid][hi+':'+field];
+}
+
+/* ===================== RENDER ===================== */
+function renderPlayers(){
+  const g=document.getElementById('playerGrid');
+  let html='<div class="head">#</div><div class="head">Name</div><div class="head">Handicap</div><div class="head"></div>';
+  state.players.forEach((p,i)=>{
+    html+=`<div>${i+1}</div>
+      <div><input type="text" value="${esc(p.name)}" onchange="setName('${p.id}',this.value)"></div>
+      <div><input type="number" value="${p.handicap}" step="1" class="${p.hcpMissing?'flagged':''}" onchange="setHcp('${p.id}',this.value)"></div>
+      <div>${state.players.length>2?`<button class="del" title="Remove" onclick="removePlayer('${p.id}')">✕</button>`:''}</div>`;
+  });
+  g.innerHTML=html;
+}
+let scOpen=true;
+function toggleScorecard(){scOpen=!scOpen;renderScorecard();}
+function renderScorecard(){
+  const wrap=document.getElementById('scorecardWrap');
+  const btn=document.getElementById('scToggle');
+  const flagCount=Object.values(state.flags||{}).reduce((a,f)=>a+Object.keys(f).length,0);
+  if(!scOpen){
+    if(btn)btn.textContent='Show';
+    const parts=state.players.map(p=>{
+      const played=(state.scores[p.id]||[]).filter(s=>s&&s.strokes!=null);
+      const g=sum(played.map(s=>s.strokes));
+      return `${esc(p.name)} ${played.length?g:'—'}`;});
+    wrap.innerHTML=`<p class="hint" style="margin:0">${parts.join(' · ')} ${flagCount?`<span class="pill warn">${flagCount} cell${flagCount>1?'s':''} to check — press Show</span>`:'<span class="pill">✓ totals verified</span>'}</p>`;
+    return;
+  }
+  if(btn)btn.textContent='Hide';
+  let html='<table><thead><tr><th rowspan="2">Hole</th><th rowspan="2">Par</th>';
+  state.players.forEach(p=>{html+=`<th colspan="4">${esc(p.name)}</th>`;});
+  html+='</tr><tr>';
+  state.players.forEach(()=>{html+='<th>S</th><th>P</th><th>FW</th><th>GR</th>';});
+  html+='</tr></thead><tbody>';
+  state.holes.forEach((h,hi)=>{
+    html+=`<tr><td class="holecell">${h.number}</td>
+      <td><input class="score-in" type="number" min="3" max="6" value="${h.par}" onchange="setPar(${hi},this.value)"></td>`;
+    state.players.forEach(p=>{
+      const s=state.scores[p.id][hi];
+      const p3=h.par===3;
+      html+=`<td><input class="score-in ${isFlagged(p.id,hi,'strokes')?'flagged':''}" type="number" min="1" value="${s.strokes??''}" onchange="setScore('${p.id}',${hi},'strokes',this.value)"></td>
+        <td><input class="score-in ${isFlagged(p.id,hi,'putts')?'flagged':''}" type="number" min="0" value="${s.putts??''}" onchange="setScore('${p.id}',${hi},'putts',this.value)"></td>
+        <td>${p3?'—':`<input class="cb" type="checkbox" ${s.fir?'checked':''} onchange="setScore('${p.id}',${hi},'fir',this.checked)">`}</td>
+        <td><input class="cb" type="checkbox" ${s.gir?'checked':''} onchange="setScore('${p.id}',${hi},'gir',this.checked)"></td>`;
+    });
+    html+='</tr>';
+  });
+  html+='</tbody></table>';
+  wrap.innerHTML=html;
+}
+function renderPairings(){
+  const wrap=document.getElementById('pairingsWrap');
+  let html='';
+  state.segments.forEach((seg,si)=>{
+    const first=state.holes[seg.holes[0]].number,last=state.holes[seg.holes[seg.holes.length-1]].number;
+    html+=`<div class="seg"><div class="seg-title">Holes ${first}–${last}</div>`;
+    const groups=seg.groups&&seg.groups.length?seg.groups:chunkPairsIntoGroups(seg.pairs.length);
+    groups.forEach(g=>{
+      html+='<div class="pairline">';
+      g.forEach((pi,k)=>{
+        if(k>0)html+='<span class="vs">vs</span>';
+        html+=pairSelects(si,pi);
+      });
+      html+='</div>';
+    });
+    html+='</div>';
+  });
+  wrap.innerHTML=html;
+}
+function pairSelects(si,pi){
+  const pair=state.segments[si].pairs[pi];
+  return pair.map((pid,slot)=>{
+    let opts=state.players.map(p=>`<option value="${p.id}" ${p.id===pid?'selected':''}>${esc(p.name)}</option>`).join('');
+    return `<select onchange="setPairSlot(${si},${pi},${slot},this.value)">${opts}</select>`;
+  }).join(' <span style="color:var(--ink-soft)">&amp;</span> ');
+}
+function renderCtp(){
+  const wrap=document.getElementById('ctpWrap');
+  const par3s=state.holes.map((h,i)=>({h,i})).filter(x=>x.h.par===3);
+  if(!par3s.length){wrap.innerHTML='<p class="hint">No par 3s on the card — set pars in the scorecard.</p>';return;}
+  let html='<div class="row">';
+  par3s.forEach(({h,i})=>{
+    let opts='<option value="">— no winner —</option>'+state.players.map(p=>`<option value="${p.id}" ${state.ctpWinners[i]===p.id?'selected':''}>${esc(p.name)}</option>`).join('');
+    html+=`<div><label>Hole ${h.number}</label><select onchange="setCtp(${i},this.value)">${opts}</select></div>`;
+  });
+  html+='</div>';
+  wrap.innerHTML=html;
+}
+function renderResults(){
+  const wrap=document.getElementById('resultsWrap');
+  const anyScore=state.players.some(p=>state.scores[p.id]&&state.scores[p.id].some(s=>s.strokes!=null));
+  if(!anyScore){wrap.innerHTML='<p class="hint">Import a round (or enter scores) and results appear here.</p>';return;}
+  const round={
+    holes:state.holes,players:state.players,scores:state.scores,
+    segments:state.segments,ctpWinners:state.ctpWinners,
+    bets:getBets(),payoutSplits:getSplits(),robinVars:getRobinVars(),
+  };
+  const r=computeAll(round);
+  let html='';
+  html+='<h3>💰 Who owes what (grand total)</h3><table class="totals-table"><thead><tr><th style="text-align:left">Player</th><th>Robin</th><th>Medal</th><th>CTP</th><th>Total</th></tr></thead><tbody>';
+  const order=[...state.players].sort((a,b)=>(r.total[b.id]||0)-(r.total[a.id]||0));
+  order.forEach(p=>{
+    html+=`<tr><td>${esc(p.name)}</td><td>${money(r.robinPay.net[p.id])}</td><td>${money(r.medal.net[p.id])}</td><td>${money(r.ctp.net[p.id])}</td><td>${money(r.total[p.id])}</td></tr>`;
+  });
+  html+='</tbody></table>';
+
+  html+=`<h3>🏌️ Medal — pool $${r.medal.pool}</h3><table><thead><tr><th style="text-align:left">Player</th><th>Gross</th><th>Hcp</th><th>Net</th><th>Place</th><th>Wins</th></tr></thead><tbody>`;
+  const medalRank=Object.fromEntries(r.medal.ranked.map(x=>[x.id,x]));
+  [...r.medal.entries].sort((a,b)=>a.net-b.net).forEach(e=>{
+    const p=state.players.find(p=>p.id===e.id);
+    const rk=medalRank[e.id];
+    const paid=r.medal.payouts[e.id]||0;
+    html+=`<tr class="${paid>0?'winner':''}"><td style="text-align:left">${esc(p.name)}</td><td>${e.gross}</td><td>${p.handicap||0}</td><td><b>${e.net}</b></td><td>${rk.rank}${rk.tieSize>1?' (T)':''}</td><td>${paid>0?'$'+paid:'—'}</td></tr>`;
+  });
+  html+='</tbody></table>';
+
+  const V=round.robinVars;
+  const offVars=[['fir','fairways'],['gir','greens'],['low','low ball'],['combined','combined'],['putts','putts']].filter(([k])=>!V[k]).map(([,n])=>n);
+  html+=`<h3>🐦 Robin — $${round.bets.robinPerPoint}/point${offVars.length?` <span class="pill warn">off: ${offVars.join(', ')}</span>`:''}</h3>`;
+  html+='<div>'+[...state.players].sort((a,b)=>(r.robin.points[b.id]||0)-(r.robin.points[a.id]||0)).map(p=>`<span class="pill">${esc(p.name)}: ${r.robin.points[p.id]||0} pts</span>`).join('')+'</div>';
+  r.robin.detail.forEach(seg=>{
+    if(!seg.holes.length)return;
+    const first=state.holes[seg.holes[0]].number,last=state.holes[seg.holes[seg.holes.length-1]].number;
+    html+=`<p class="hint" style="margin:8px 0 0">Holes ${first}–${last}: `+seg.pairs.map(pp=>`${esc(pname(pp.pair[0]))} & ${esc(pname(pp.pair[1]))} → ${pp.points} pts`).join(' · ')+'</p>';
+  });
+  if(r.robinPay.matrix.length){
+    html+='<h3 style="font-size:13px">Robin settlement</h3><ul class="settle">';
+    r.robinPay.matrix.forEach(m=>{html+=`<li>${esc(pname(m.from))} pays ${esc(pname(m.to))} <b>$${m.amount}</b></li>`;});
+    html+='</ul>';
+  }
+
+  html+=`<h3>🎯 Closest to the pin — pool $${r.ctp.pool}</h3>`;
+  const winners=Object.entries(r.ctp.wins).filter(([,n])=>n>0);
+  if(!winners.length){html+='<p class="hint">No CTP winners selected yet (section 5).</p>';}
+  else{
+    html+='<div>'+winners.sort((a,b)=>b[1]-a[1]).map(([id,n])=>`<span class="pill">${esc(pname(id))}: ${n} win${n>1?'s':''} ${r.ctp.payouts[id]?'→ $'+r.ctp.payouts[id]:''}</span>`).join('')+'</div>';
+  }
+  wrap.innerHTML=html;
+}
+function money(v){
+  if(v==null)v=0;
+  const cls=v>0?'money-pos':(v<0?'money-neg':'');
+  const sign=v>0?'+':'';
+  return `<span class="${cls}">${sign}$${Math.abs(v)<0.005?0:v}</span>`;
+}
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+/* ===================== MUTATIONS ===================== */
+function setName(id,v){const p=state.players.find(p=>p.id===id);if(p)p.name=v.trim()||p.name;refresh(['players','scorecard','pairings','ctp','results']);}
+function setHcp(id,v){const p=state.players.find(p=>p.id===id);if(p){p.handicap=parseFloat(v)||0;p.hcpMissing=false;}refresh(['players','results']);}
+function addPlayer(){
+  const n=state.players.length+1;
+  state.players.push({id:'p'+state.nextId++,name:'Player '+n,handicap:0});
+  customPairs=false;
+  refresh(['players','scorecard','pairings','ctp','results']);
+}
+function removePlayer(id){
+  state.players=state.players.filter(p=>p.id!==id);
+  Object.keys(state.ctpWinners).forEach(k=>{if(state.ctpWinners[k]===id)delete state.ctpWinners[k];});
+  customPairs=false;
+  refresh(['players','scorecard','pairings','ctp','results']);
+}
+function setPar(hi,v){
+  state.holes[hi].par=parseInt(v)||4;
+  refresh(['scorecard','ctp','results']);
+}
+function setScore(pid,hi,key,v){
+  const s=state.scores[pid][hi];
+  if(key==='fir'||key==='gir')s[key]=!!v;
+  else{s[key]=v===''?null:Math.max(0,parseInt(v)||0);setFlag(pid,hi,key,false);}
+  refresh(['results']);
+}
+function setPairSlot(si,pi,slot,pid){
+  customPairs=true;
+  state.segments[si].pairs[pi][slot]=pid;
+  refresh(['pairings','results']);
+}
+function setCtp(hi,pid){
+  if(pid==='')delete state.ctpWinners[hi];else state.ctpWinners[hi]=pid;
+  refresh(['results']);
+}
+function resetAll(){
+  if(!confirmReset())return;
+  state=freshState();customPairs=false;
+  document.getElementById('importStatus').innerHTML='';
+  init();
+}
+let resetArmed=false;
+function confirmReset(){
+  if(resetArmed){resetArmed=false;return true;}
+  resetArmed=true;setTimeout(()=>{resetArmed=false;},2500);
+  alertBar('Tap "Clear everything" again to confirm.');
+  return false;
+}
+function alertBar(msg){
+  let el=document.getElementById('alertbar');
+  if(!el){el=document.createElement('div');el.id='alertbar';el.style.cssText='position:fixed;bottom:14px;left:50%;transform:translateX(-50%);background:var(--green-900);color:#fff;padding:8px 16px;border-radius:999px;font-size:13px;z-index:9;box-shadow:0 4px 14px rgba(0,0,0,.25)';document.body.appendChild(el);}
+  el.textContent=msg;el.style.display='block';
+  clearTimeout(el._t);el._t=setTimeout(()=>{el.style.display='none';},2400);
+}
+function loadSample(){
+  state=freshState();
+  state.players=[
+    {id:'p1',name:'Rod',handicap:10},
+    {id:'p2',name:'Jon',handicap:5},
+    {id:'p3',name:'Max',handicap:15},
+    {id:'p4',name:'Leo',handicap:8},
+  ];
+  state.nextId=5;
+  ensureScores();
+  const rng=mulberry32(42);
+  state.players.forEach((p,idx)=>{
+    state.holes.forEach((h,hi)=>{
+      const over=Math.floor(rng()*3)+(idx===0?0:1)-(rng()>0.8?1:0);
+      const strokes=Math.max(h.par-1,h.par+over);
+      const putts=Math.min(3,Math.max(1,Math.floor(rng()*3)));
+      state.scores[p.id][hi]={
+        strokes,putts,
+        fir:h.par===3?null:rng()>0.45,
+        gir:rng()>0.55,
+      };
+    });
+  });
+  const par3s=state.holes.map((h,i)=>h.par===3?i:-1).filter(i=>i>=0);
+  state.ctpWinners={};
+  par3s.forEach((hi,k)=>{if(rng()>0.25)state.ctpWinners[hi]=state.players[Math.floor(rng()*4)].id;});
+  customPairs=false;
+  init();
+  alertBar('Sample round loaded — scroll down to see the payouts.');
+}
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;var t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;}}
+
+function refresh(parts){
+  ensureScores();ensureSegments();
+  if(parts.includes('players'))renderPlayers();
+  if(parts.includes('scorecard'))renderScorecard();
+  if(parts.includes('pairings'))renderPairings();
+  if(parts.includes('ctp'))renderCtp();
+  if(parts.includes('results'))renderResults();
+}
+function init(){refresh(['players','scorecard','pairings','ctp','results']);}
+['betMedal','betCtp','betRobin','splitSmall','splitLarge'].forEach(id=>{
+  document.getElementById(id).addEventListener('input',()=>renderResults());
+});
+
+/* ===================== GRINT IMPORT ===================== */
+const TEMPLATES=[{"d":"0","bits":"0000111111110000000111111111100000111110011110000011100000111100001110000011110000111000000111000011100000011100001110000001110000111000000111000011100000011100001110000011110000111000001111000011111001111000000111111111100000001111111100000000000110000000"},{"d":"1","bits":"0000000011110000000000011111000000000111111100000000111101110000000111100111000000000000011100000000000001110000000000000111000000000000011100000000000001110000000000000111000000000000011100000000000001110000000000000111000000000000011100000000000001110000"},{"d":"2","bits":"0000111111110000000111111111000000011111111110000011110000111000001111000011110000000000001110000000000001111000000000000111000000000001111100000000001111000000000001111100000000001111000000000001111100000000001111111111110000111111111111000011111111111100"},{"d":"2","bits":"0000011111100000000011111111000000111111111110000011100000111000001110000011100000000000001110000000000001111000000000001111000000000001111100000000001111100000000001111000000000001111000000000001111000000000001111100000000000111111111111000011111111111000"},{"d":"2","bits":"0000011111110000000011111111000000011111111110000001110000111100001111000011110000000000001111000000000001111000000000000111000000000001111100000000000111000000000001111100000000000111000000000001111100000000000111100000000000111111111111000011111111111100"},{"d":"2","bits":"0000111111110000000011111111100000111110011110000011100000111000001110000011100000000000001110000000000001111000000000001111000000000001111000000000001111000000000011111000000000001111000000000011111000000000001111111111100000111111111111000011111111111000"},{"d":"3","bits":"0011111111111000001111111111100000111111111110000000000001110000000000001110000000000001110000000000001111000000000001111111000000000011111110000000000000111100000000000001110000000000000111000011100000111100001111100111100000011111111110000000011111100000"},{"d":"3","bits":"0011111111111000001111111111100000000000011110000000000011100000000000011110000000000011100000000000011111110000000001111111100000000000011110000000000000111100000000000001110001110000000111000111100000111100001111111111100000011111111100000000111111100000"},{"d":"3","bits":"0011111111111000001111111111100000000000011110000000000011100000000000011110000000000011110000000000011111000000000001111111000000000111111110000000000000111100000000000001110000000000000111000011100000111100001111101111100000011111111110000000011111000000"},{"d":"3","bits":"0001111111111000000111111111100000000000011110000000000001110000000000001110000000000001110000000000001111100000000000111111100000000011111111000000000000011100000000000001110000000000000111000011110000111100000111111111100000011111111110000000001111100000"},{"d":"4","bits":"0000000011110000000000011111000000000011111100000000001111110000000001110111000000001110011100000001111001110000000111000111000000111000011100000011100001110000011111111111111001111111111111100011111111111100000000000111000000000000011100000000000001110000"},{"d":"4","bits":"0000000111110000000000011111000000000011111100000000011101110000000011100111000000001110011100000001110001110000001110000111000000111000011100000111000001110000011111111111110001111111111111000000000001110000000000000111000000000000011100000000000001110000"},{"d":"5","bits":"0000111111111000000011111111100000011111111110000001110000000000000111000000000000011000000000000001111111110000001111111111100000111100001110000000000000111100000000000001110000111000000111000011110000111100001111101111100000011111111110000000001111000000"},{"d":"5","bits":"0001111111111000000111111111100000111000000000000011100000000000001110000000000000111011110000000011111111110000001111000111100000111000001111000000000000011100000000000001110000111000000111000011100000111100001111111111100000011111111100000000111111100000"},{"d":"5","bits":"0001111111111000000111111111100000011100000000000001100000000000001110000000000000111001100000000011111111111000001111000111100000111000001110000000000000111100000000000011110001110000001111000111100000111000011111111111100000011111111100000001111111100000"},{"d":"6","bits":"0000000111100000000000111100000000000011100000000000011110000000000011110000000000001111111000000001111111111000001111100111100000111000001110000011100000111100001110000001110000111000001111000011110000111000001111101111100000011111111110000000001111000000"},{"d":"6","bits":"0000001111100000000000111100000000000111110000000000111100000000000011100000000000011111111000000011111111111000001111000111100000111000001111000011100000011100011110000001110000111000000111000011100000111100001111111111100000011111111100000000111111100000"},{"d":"6","bits":"0000000111100000000000111100000000000111100000000000011100000000000111110000000000011111111000000011111111111000001111000011100001111000001111000111000000111100011100000001110001110000001111000111100000111000001111111111100000011111111100000000111111100000"},{"d":"6","bits":"0000000111000000000000011100000000000011110000000000011100000000000011110000000000001111110000000001111111110000000111100111100000111100001111000011100000011100011110000001110000111000000111000011110000111100000111100111100000011111111100000000011111000000"},{"d":"7","bits":"0011111111111000001111111111100000000000001110000000000000111000000000000111100000000000011100000000000011100000000000001110000000000000111000000000000111100000000000011100000000000011100000000000011110000000000001111000000000000111000000000000111100000000"},{"d":"7","bits":"0011111111111000001111111111100000000000001110000000000001111000000000001111000000000000111000000000000011100000000000001110000000000001110000000000001111000000000000111000000000000111100000000000011110000000000001110000000000001111000000000000111000000000"},{"d":"7","bits":"0011111111111000001111111111100000111111111110000000000000111000000000000111100000000000011100000000000011110000000000001110000000000000111000000000000111000000000000111100000000000011100000000000001110000000000000111000000000000111000000000000111000000000"},{"d":"7","bits":"0011111111111000001111111111100000111111111110000000000001111000000000000111000000000000111000000000000011100000000000001110000000000001111000000000000111000000000000111000000000000011100000000000011110000000000001110000000000001111000000000000111000000000"},{"d":"8","bits":"0001111111111000000111111111100000111100001111000011100000011100001110000001110000011100001110000001111111111000000111111111100000011111111110000011110000111100011100000001110001110000000111000011100000011100001111111111110000011111111110000000111111110000"},{"d":"8","bits":"0001111111110000000111111111100000111100001110000111000000111000011110000011100000111000001110000001111111111000000111111111000000111111111110000111100000111100011100000001110001110000000111000111000000111100011111101111100000011111111110000001111111100000"},{"d":"8","bits":"0000111111100000000111111111000000111110011110000011100000111000001110000011100000111000001110000011111111111000000011111111000000111111111110000011100000111000001110000011110000111000000111000011100000111100001111000111100000111111111110000000011111000000"},{"d":"8","bits":"0000111111110000000011111111100000011110011110000011100000011100001110000001110000011100001110000001111111111000000011111111000000111111111111000011100000011100001110000001110000111000000111000011100000011100001111100011110000011111111110000000001111100000"},{"d":"9","bits":"0001111111110000000111111111100001111100011110000111000000111000011100000011110001110000001110000111100000111000001111000111100000011111111110000001111111110000000000001110000000000001111000000000001111000000000001111000000000000111000000000000111100000000"},{"d":"9","bits":"0000111111100000000111111111000000111111111110000011100000111000001110000011110000111000001111000011100000111000001111000011100000111111111110000000111111110000000001111110000000000001111000000000001111000000000000111000000000000111100000000000111000000000"}];
+const TPL=TEMPLATES.map(t=>{const a=new Uint8Array(256);for(let i=0;i<t.bits.length;i++)a[i]=t.bits[i]==='1'?1:0;return{d:t.d,bits:a};});
+const TN=16;
+
+function ilum(r,g,b){return 0.2126*r+0.7152*g+0.0722*b;}
+
+function cellGlyphs(px,W,H,cx,cy,halfW,halfH){
+  const x0=Math.max(0,Math.round(cx-halfW)),x1=Math.min(W,Math.round(cx+halfW));
+  const y0=Math.max(0,Math.round(cy-halfH)),y1=Math.min(H,Math.round(cy+halfH));
+  const w=x1-x0,h=y1-y0;
+  if(w<4||h<4)return[];
+  const mask=new Uint8Array(w*h);
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+    const i=((y0+y)*W+(x0+x))*4;
+    if(ilum(px[i],px[i+1],px[i+2])<90)mask[y*w+x]=1;}
+  const label=new Int32Array(w*h).fill(-1);
+  const comps=[];const stack=[];
+  for(let s=0;s<w*h;s++){
+    if(!mask[s]||label[s]!==-1)continue;
+    const id=comps.length;
+    const comp={px:[],minX:w,maxX:-1,minY:h,maxY:-1,touchesEdge:false,count:0};
+    comps.push(comp);stack.length=0;stack.push(s);label[s]=id;
+    while(stack.length){
+      const c=stack.pop();
+      const cxx=c%w,cyy=(c/w)|0;
+      comp.count++;comp.px.push(c);
+      if(cxx<comp.minX)comp.minX=cxx;if(cxx>comp.maxX)comp.maxX=cxx;
+      if(cyy<comp.minY)comp.minY=cyy;if(cyy>comp.maxY)comp.maxY=cyy;
+      if(cxx===0||cyy===0||cxx===w-1||cyy===h-1)comp.touchesEdge=true;
+      for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
+        if(!dx&&!dy)continue;
+        const nx=cxx+dx,ny=cyy+dy;
+        if(nx<0||nx>=w||ny<0||ny>=h)continue;
+        const n2=ny*w+nx;
+        if(mask[n2]&&label[n2]===-1){label[n2]=id;stack.push(n2);}}}}
+  const isFrame=c=>{
+    const bw=c.maxX-c.minX+1,bh=c.maxY-c.minY+1;
+    if(bw>=0.7*w&&bh>=0.7*h)return true;
+    return c.count/(bw*bh)<0.14;};
+  let keep=comps.filter(c=>!c.touchesEdge&&c.count>=12&&!isFrame(c));
+  if(!keep.length)return[];
+  keep.sort((a,b)=>a.minX-b.minX);
+  const glyphs=[];
+  for(const c of keep){
+    const last=glyphs[glyphs.length-1];
+    if(last&&c.minX<=last.maxX-2){
+      last.px=last.px.concat(c.px);
+      last.minX=Math.min(last.minX,c.minX);last.maxX=Math.max(last.maxX,c.maxX);
+      last.minY=Math.min(last.minY,c.minY);last.maxY=Math.max(last.maxY,c.maxY);
+      last.count+=c.count;
+    }else glyphs.push(c);}
+  return glyphs.map(g=>{
+    const gw=g.maxX-g.minX+1,gh=g.maxY-g.minY+1;
+    const grid=new Float32Array(TN*TN);
+    const scale=Math.max(gw,gh);
+    const offX=(scale-gw)/2,offY=(scale-gh)/2;
+    for(const p of g.px){
+      const pxx=p%w-g.minX,pyy=((p/w)|0)-g.minY;
+      const nx=Math.min(TN-1,Math.floor((pxx+offX)/scale*TN));
+      const ny=Math.min(TN-1,Math.floor((pyy+offY)/scale*TN));
+      grid[ny*TN+nx]+=1;}
+    const cell=(scale/TN)*(scale/TN);
+    const bits=new Uint8Array(TN*TN);
+    for(let i=0;i<TN*TN;i++)bits[i]=grid[i]>=cell*0.35?1:0;
+    return{bits};});
+}
+function dice(a,b){
+  let inter=0,sa=0,sb=0;
+  for(let i=0;i<TN*TN;i++){if(a[i])sa++;if(b[i])sb++;if(a[i]&&b[i])inter++;}
+  return(2*inter)/(sa+sb||1);}
+function classifyGlyphs(glyphs){
+  if(!glyphs.length)return{value:null,conf:0};
+  let digits='',minConf=1;
+  for(const g of glyphs){
+    let best=null,bestScore=-1;
+    for(const t of TPL){
+      const s=dice(g.bits,t.bits);
+      if(s>bestScore){bestScore=s;best=t.d;}}
+    digits+=best;
+    if(bestScore<minConf)minConf=bestScore;}
+  return{value:parseInt(digits),conf:minConf};}
+function cellIcon(px,W,H,cx,cy,halfW,halfH){
+  const x0=Math.max(0,Math.round(cx-halfW)),x1=Math.min(W,Math.round(cx+halfW));
+  const y0=Math.max(0,Math.round(cy-halfH)),y1=Math.min(H,Math.round(cy+halfH));
+  let green=0,red=0;
+  for(let y=y0;y<y1;y++)for(let x=x0;x<x1;x++){
+    const i=(y*W+x)*4,r=px[i],g=px[i+1],b=px[i+2];
+    if(r>250&&g>250&&b>250)continue;
+    if(g>b+20&&g>=r-30&&r>60)green++;
+    else if(r>g+40&&r>b+40)red++;}
+  if(green<10&&red<10)return null;
+  return green>=red?'green':'red';}
+function repairRange(cells,i0,i1,target){
+  if(target==null){cells.slice(i0,i1).forEach(c=>{if(c.conf<0.72)c.flag=true;});return;}
+  const cur=()=>cells.slice(i0,i1).reduce((a,c)=>a+(c.value||0),0);
+  if(cur()===target)return;
+  const idxs=[];
+  for(let i=i0;i<i1;i++)idxs.push(i);
+  idxs.sort((a,b)=>(cells[a].conf||0)-(cells[b].conf||0));
+  for(const i of idxs){
+    const need=target-(cur()-(cells[i].value||0));
+    if(need>=1&&need<=19){
+      const old=cells[i].value;
+      cells[i].value=need;
+      if(cur()===target){cells[i].flag=true;return;}
+      cells[i].value=old;}}
+  cells.slice(i0,i1).forEach(c=>{c.flag=true;});}
+
+function num(t){return /^\d+$/.test(t);}
+function isPuttsL(t){return /^PUTTS$/i.test(t);}
+function isDrivingL(t){return /^DR.{0,4}ING\|?$/i.test(t)||/^DRIVING$/i.test(t);}
+function isGirL(t){return /^GIR/i.test(t);}
+function isPenL(t){return /^PENALT/i.test(t);}
+function reconcile(r){
+  const okT=r.out!=null&&r.inn!=null&&r.total===r.out+r.inn;
+  const okN=r.total!=null&&r.hcp!=null&&r.net===r.total-r.hcp;
+  if(okT&&okN)return;
+  if(r.out!=null&&r.inn!=null&&r.hcp!=null&&r.net!=null&&r.net===r.out+r.inn-r.hcp){r.total=r.out+r.inn;return;}
+  if(r.net!=null&&r.hcp!=null&&(r.total==null||r.total!==(r.out??0)+(r.inn??0))){
+    const t=r.net+r.hcp;
+    if(r.out!=null&&r.inn!=null&&r.out+r.inn===t){r.total=t;return;}
+    if(r.out!=null&&r.inn==null){r.total=t;r.inn=t-r.out;return;}
+    if(r.inn!=null&&r.out==null){r.total=t;r.out=t-r.inn;return;}
+    if(r.out==null&&r.inn==null){r.total=t;return;}
+    r.total=(r.out+r.inn===t)?t:r.out+r.inn;
+    return;}
+  if(r.out!=null&&r.inn!=null){r.total=r.out+r.inn;return;}
+  if(r.total!=null&&r.out!=null&&r.inn==null)r.inn=r.total-r.out;
+  if(r.total!=null&&r.inn!=null&&r.out==null)r.out=r.total-r.inn;
+}
+function parseAnchorsFromWords(words){
+  const holeWord=words.find(w=>/^HOLE$/i.test(w.text));
+  const outAny=words.find(w=>/^out$/i.test(w.text));
+  if(!holeWord&&!outAny)throw new Error('This doesn\'t look like a Grint scorecard (no HOLE/OUT header found).');
+  const headerY=(holeWord||outAny).y;
+  const headerRow=words.filter(w=>Math.abs(w.y-headerY)<15);
+  const outW=headerRow.find(w=>/out/i.test(w.text));
+  const inW=headerRow.filter(w=>/^in$/i.test(w.text)).sort((a,b)=>b.x-a.x)[0];
+  const totalW=headerRow.find(w=>/total/i.test(w.text));
+  const hcpW=words.find(w=>/^HCP$/i.test(w.text));
+  const netW=words.find(w=>/^NET$/i.test(w.text));
+  if(!outW)throw new Error('Couldn\'t find the OUT column in the screenshot.');
+  let cols=headerRow.filter(w=>num(w.text)).map(w=>({n:parseInt(w.text),x:w.x})).sort((a,b)=>a.x-b.x);
+  const front=cols.filter(c=>c.x<outW.x);
+  const back=cols.filter(c=>c.x>outW.x&&(!inW||c.x<inW.x));
+  if(front.length<2)throw new Error('Couldn\'t locate the hole columns.');
+  const pitchF=(front[front.length-1].x-front[0].x)/(front.length-1);
+  const holeCols=[];
+  for(let i=0;i<9;i++)holeCols.push(front[0].x+pitchF*i);
+  let pitchB=pitchF;
+  if(back.length>1){
+    pitchB=(back[back.length-1].x-back[0].x)/(back.length-1);
+    for(let i=0;i<9;i++)holeCols.push(back[0].x+pitchB*i);
+  }
+  const pitch=(pitchF+pitchB)/2;
+
+  const parW=words.find(w=>/^PAR$/i.test(w.text));
+  if(!parW)throw new Error('Couldn\'t find the PAR row.');
+  const parRow=words.filter(w=>Math.abs(w.y-parW.y)<25&&num(w.text));
+  const pars=holeCols.map(cx=>{
+    const w=parRow.filter(p=>Math.abs(p.x-cx)<pitch/3).sort((a,b)=>Math.abs(a.x-cx)-Math.abs(b.x-cx))[0];
+    return w?parseInt(w.text):null;});
+
+  const statLabels=words.filter(w=>(isPuttsL(w.text)||isDrivingL(w.text)||isGirL(w.text)||isPenL(w.text))&&w.x<holeCols[0]);
+  const isStatY=y=>statLabels.some(l=>Math.abs(l.y-y)<25);
+
+  const sumCols=[outW,inW,totalW,hcpW,netW].filter(Boolean);
+  const colVals=words.filter(w=>num(w.text)&&w.y>parW.y+30&&!isStatY(w.y)&&sumCols.some(a=>Math.abs(w.x-a.x)<50));
+  const clusters=[];
+  for(const w of [...colVals].sort((a,b)=>a.y-b.y)){
+    const c=clusters.find(c=>Math.abs(c.y-w.y)<25);
+    if(c){c.words.push(w);c.y=c.words.reduce((s,x)=>s+x.y,0)/c.words.length;}
+    else clusters.push({y:w.y,words:[w]});}
+  const grabIn=(list,anchor)=>{
+    if(!anchor)return null;
+    const c=list.filter(w=>Math.abs(w.x-anchor.x)<50)[0];
+    return c?parseInt(c.text):null;};
+  const grab=(rowY,anchor)=>{
+    if(!anchor)return null;
+    const c=words.filter(w=>num(w.text)&&Math.abs(w.x-anchor.x)<50&&Math.abs(w.y-rowY)<30)[0];
+    return c?parseInt(c.text):null;};
+  const playerRows=clusters.filter(c=>c.words.length>=2).map(c=>{
+    const cand=words.filter(w=>w.x<holeCols[0]-40&&w.y>c.y-80&&w.y<c.y+40&&/^[A-Za-zÀ-ÿ'.-]{2,}$/.test(w.text)&&!isPuttsL(w.text)&&!isDrivingL(w.text)&&!isGirL(w.text)&&!isPenL(w.text)&&!/^(PAR|HOLE)$/i.test(w.text));
+    // group candidate words into lines by y, prefer real words (3+ chars), take the best line
+    const lines=[];
+    for(const w of [...cand].sort((a,b)=>a.y-b.y)){
+      const L=lines.find(L=>Math.abs(L.y-w.y)<12);
+      if(L){L.words.push(w);L.y=(L.y+w.y)/2;}else lines.push({y:w.y,words:[w]});}
+    let nameWords=[];
+    let bestLen=0;
+    for(const L of lines){
+      let ws=L.words.filter(w=>w.text.length>=3);
+      if(!ws.length)ws=L.words;
+      const len=ws.reduce((s,w)=>s+w.text.length,0);
+      if(len>bestLen){bestLen=len;nameWords=ws.sort((a,b)=>a.x-b.x);}}
+    const r={
+      name:nameWords.map(w=>w.text).join(' ')||'Player',
+      y:c.y,
+      out:grabIn(c.words,outW),inn:grabIn(c.words,inW),total:grabIn(c.words,totalW),
+      hcp:grabIn(c.words,hcpW),net:grabIn(c.words,netW),
+    };
+    reconcile(r);
+    return r;}).sort((a,b)=>a.y-b.y);
+
+  for(const lab of statLabels){
+    const owner=[...playerRows].filter(p=>p.y<lab.y&&lab.y-p.y<320).sort((a,b)=>b.y-a.y)[0];
+    if(!owner)continue;
+    if(isPuttsL(lab.text)){owner.puttsY=lab.y;owner.puttsOut=grab(lab.y,outW);owner.puttsIn=grab(lab.y,inW);owner.puttsTot=grab(lab.y,totalW);}
+    else if(isDrivingL(lab.text))owner.drivingY=lab.y;
+    else if(isGirL(lab.text))owner.girY=lab.y;}
+  if(!playerRows.length)throw new Error('No player rows found on this screenshot.');
+  const sumX={out:outW&&outW.x,inn:inW&&inW.x,total:totalW&&totalW.x,hcp:hcpW&&hcpW.x,net:netW&&netW.x};
+  return{holeCols,pars,playerRows,pitch,sumX};
+}
+function extractWords(data){
+  const words=[];
+  const push=w=>{if(w&&w.bbox)words.push({text:(w.text||'').trim(),x:(w.bbox.x0+w.bbox.x1)/2,y:(w.bbox.y0+w.bbox.y1)/2});};
+  if(data.words&&data.words.length){data.words.forEach(push);return words;}
+  (data.blocks||[]).forEach(b=>(b.paragraphs||[]).forEach(p=>(p.lines||[]).forEach(l=>(l.words||[]).forEach(push))));
+  return words;
+}
+
+let tessWorkerPromise=null;
+function getTessWorker(){
+  if(tessWorkerPromise)return tessWorkerPromise;
+  tessWorkerPromise=(async()=>{
+    if(typeof Tesseract==='undefined'){
+      const src=(window.__tessOpts&&window.__tessOpts.scriptSrc)||'https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.1.1/tesseract.min.js';
+      await new Promise((res,rej)=>{
+        const s=document.createElement('script');
+        s.src=src;s.onload=res;s.onerror=()=>rej(new Error('Could not load the OCR engine. Check your internet connection, or open this file directly in your browser and try again.'));
+        document.head.appendChild(s);});
+    }
+    const opts=Object.assign({},window.__tessOpts&&window.__tessOpts.workerOpts);
+    return await Tesseract.createWorker('eng',1,opts);
+  })();
+  tessWorkerPromise.catch(()=>{tessWorkerPromise=null;});
+  return tessWorkerPromise;
+}
+async function fileToCanvas(file){
+  const url=URL.createObjectURL(file);
+  try{
+    const img=await new Promise((res,rej)=>{
+      const im=new Image();
+      im.onload=()=>res(im);im.onerror=()=>rej(new Error('Could not read that image file.'));
+      im.src=url;});
+    const canvas=document.createElement('canvas');
+    canvas.width=img.naturalWidth;canvas.height=img.naturalHeight;
+    const ctx=canvas.getContext('2d',{willReadFrequently:true});
+    ctx.drawImage(img,0,0);
+    return canvas;
+  }finally{URL.revokeObjectURL(url);}
+}
+
+async function importImages(files){
+  const status=document.getElementById('importStatus');
+  const lines=[];
+  const say=()=>{status.innerHTML=lines.join('<br>');};
+  const imported=[];
+  let worker;
+  try{
+    lines.push('Loading the reader…');say();
+    worker=await getTessWorker();
+    lines.pop();
+  }catch(e){
+    lines.push(`<span class="err">✕ ${esc(e.message)}</span>`);say();
+    return;
+  }
+  for(const file of files){
+    lines.push(`Reading <b>${esc(file.name||'pasted image')}</b>…`);say();
+    try{
+      const canvas=await fileToCanvas(file);
+      const ctx=canvas.getContext('2d');
+      const px=ctx.getImageData(0,0,canvas.width,canvas.height).data;
+      const W=canvas.width,H=canvas.height;
+      const{data}=await worker.recognize(canvas,{},{blocks:true});
+      const A=parseAnchorsFromWords(extractWords(data));
+      const halfW=A.pitch*0.36;
+      // re-read summary columns with the glyph classifier (more reliable than word OCR)
+      const readSum=(x,y)=>{
+        if(x==null)return{value:null,conf:0};
+        return classifyGlyphs(cellGlyphs(px,W,H,x,y,46,26));};
+      for(const row of A.playerRows){
+        for(const[key,sx]of Object.entries({out:A.sumX.out,inn:A.sumX.inn,total:A.sumX.total,hcp:A.sumX.hcp,net:A.sumX.net})){
+          const c=readSum(sx,row.y);
+          if(c.value!=null&&c.conf>=0.75)row[key]=c.value;
+        }
+        reconcile(row);
+        if(row.puttsY){
+          for(const[key,sx]of Object.entries({puttsOut:A.sumX.out,puttsIn:A.sumX.inn,puttsTot:A.sumX.total})){
+            const c=readSum(sx,row.puttsY);
+            if(c.value!=null&&c.conf>=0.75)row[key]=c.value;
+          }
+        }
+      }
+      for(const row of A.playerRows){
+        const cells=A.holeCols.map(cx=>classifyGlyphs(cellGlyphs(px,W,H,cx,row.y,halfW,22)));
+        cells.forEach(c=>{if(c.value!=null&&(c.value<1||c.value>19)){c.value=null;c.flag=true;}});
+        repairRange(cells,0,Math.min(9,cells.length),row.out);
+        if(cells.length>9)repairRange(cells,9,18,row.inn);
+        const s18=cells.reduce((a,c)=>a+(c.value||0),0);
+        if(cells.some(c=>c.flag)&&row.total!=null&&s18===row.total&&s18>0)cells.forEach(c=>{c.flag=false;});
+        row.cells=cells;
+        if(row.puttsY){
+          const pc=A.holeCols.map(cx=>classifyGlyphs(cellGlyphs(px,W,H,cx,row.puttsY,halfW,18)));
+          pc.forEach(c=>{if(c.value!=null&&c.value>9){c.value=null;c.flag=true;}});
+          repairRange(pc,0,Math.min(9,pc.length),row.puttsOut);
+          if(pc.length>9)repairRange(pc,9,18,row.puttsIn);
+          const ps18=pc.reduce((a,c)=>a+(c.value||0),0);
+          if(pc.some(c=>c.flag)&&row.puttsTot!=null&&ps18===row.puttsTot&&ps18>0)pc.forEach(c=>{c.flag=false;});
+          row.puttCells=pc;
+        }
+        if(row.drivingY)row.drv=A.holeCols.map(cx=>cellIcon(px,W,H,cx,row.drivingY,halfW,18));
+        if(row.girY)row.girIcons=A.holeCols.map(cx=>cellIcon(px,W,H,cx,row.girY,halfW,18));
+      }
+      imported.push(A);
+      const names=A.playerRows.map(r=>r.name).join(', ');
+      const flags=A.playerRows.reduce((n,r)=>n+(r.cells||[]).filter(c=>c.flag).length+(r.puttCells||[]).filter(c=>c.flag).length,0);
+      lines.pop();
+      lines.push(`<span class="ok">✓ ${esc(file.name||'pasted image')}</span> — ${esc(names)}${flags?` <span class="warn">(${flags} cell${flags>1?'s':''} to double-check)</span>`:''}`);
+      say();
+    }catch(e){
+      lines.pop();
+      lines.push(`<span class="err">✕ ${esc(file.name||'pasted image')}: ${esc(e.message)}</span>`);say();
+    }
+  }
+  if(imported.length)applyImport(imported);
+}
+
+function applyImport(results){
+  const nHoles=Math.max(...results.map(A=>A.holeCols.length));
+  // pars: first result that has them
+  let pars=null;
+  for(const A of results){if(A.pars&&A.pars.filter(p=>p).length>=nHoles-1){pars=A.pars;break;}}
+  pars=pars||results[0].pars;
+  const players=[]; // {key,name,hcp,scores[],putts[],fir[],gir[],flags:{}}
+  const findP=name=>{
+    const key=name.toLowerCase().replace(/[^a-zà-ÿ]/g,'');
+    let p=players.find(p=>p.key===key||p.key.includes(key)||key.includes(p.key));
+    if(!p){p={key,name,hcp:null,scores:Array(nHoles).fill(null),putts:Array(nHoles).fill(null),fir:Array(nHoles).fill(null),gir:Array(nHoles).fill(null),flags:{}};players.push(p);}
+    return p;};
+  for(const A of results){
+    for(const row of A.playerRows){
+      const p=findP(row.name);
+      if(row.hcp!=null)p.hcp=row.hcp;
+      (row.cells||[]).forEach((c,i)=>{
+        if(c.value!=null){p.scores[i]=c.value;if(c.flag)p.flags[i+':strokes']=true;else delete p.flags[i+':strokes'];}});
+      (row.puttCells||[]).forEach((c,i)=>{
+        if(c.value!=null){p.putts[i]=c.value;if(c.flag)p.flags[i+':putts']=true;else delete p.flags[i+':putts'];}});
+      (row.drv||[]).forEach((ic,i)=>{if(ic!=null)p.fir[i]=(ic==='green');});
+      (row.girIcons||[]).forEach((ic,i)=>{if(ic!=null)p.gir[i]=(ic==='green');});
+    }
+  }
+  // build state
+  state=freshState();
+  state.holes=Array.from({length:nHoles},(_,i)=>({number:i+1,par:(pars&&pars[i])||4}));
+  state.players=players.map((p,i)=>({id:'p'+(i+1),name:p.name,handicap:p.hcp??0,hcpMissing:p.hcp==null}));
+  state.nextId=players.length+1;
+  state.scores={};state.flags={};
+  players.forEach((p,i)=>{
+    const pid='p'+(i+1);
+    state.scores[pid]=state.holes.map((h,hi)=>({
+      strokes:p.scores[hi],
+      putts:p.putts[hi],
+      fir:h.par===3?null:(p.fir[hi]??false),
+      gir:p.gir[hi]??false,
+    }));
+    state.flags[pid]={};
+    Object.keys(p.flags).forEach(k=>{state.flags[pid][k]=true;});
+  });
+  state.ctpWinners={};
+  customPairs=false;
+  scOpen=Object.values(state.flags).some(f=>Object.keys(f).length>0);
+  // Robin variable availability
+  const anyPutts=players.some(p=>p.putts.some(v=>v!=null));
+  const anyFir=players.some(p=>p.fir.some(v=>v!=null));
+  const anyGir=players.some(p=>p.gir.some(v=>v!=null));
+  document.getElementById('rv-putts').checked=anyPutts;
+  document.getElementById('rv-fir').checked=anyFir;
+  document.getElementById('rv-gir').checked=anyGir;
+  init();
+  const missing=[];
+  if(!anyPutts)missing.push('putts');
+  if(!anyFir)missing.push('fairways');
+  if(!anyGir)missing.push('greens');
+  const noStats=players.filter(p=>!p.putts.some(v=>v!=null)&&!p.fir.some(v=>v!=null)&&!p.gir.some(v=>v!=null)).map(p=>p.name);
+  const status=document.getElementById('importStatus');
+  status.innerHTML+=`<br><span class="ok">Round loaded: ${players.length} player${players.length>1?'s':''}, ${nHoles} holes.</span>`+
+    (missing.length?` <span class="warn">No ${missing.join('/')} data found — add the expanded Grint stats screenshots to include them in Robin, or those variables stay off.</span>`:'')+
+    (!missing.length&&noStats.length?` <span class="warn">No putts/fairways/greens yet for: ${noStats.map(esc).join(', ')} — add their expanded stats screenshots so Robin counts those points for them.</span>`:'')+
+    '<br>Next: check any highlighted cells, confirm the Robin pairings (section 4), and pick the closest-to-the-pin winners (section 5).';
+}
+
+const dropZone=document.getElementById('dropZone');
+const fileInput=document.getElementById('fileInput');
+dropZone.addEventListener('click',()=>fileInput.click());
+fileInput.addEventListener('change',()=>{if(fileInput.files.length)importImages([...fileInput.files]);fileInput.value='';});
+dropZone.addEventListener('dragover',e=>{e.preventDefault();dropZone.classList.add('over');});
+dropZone.addEventListener('dragleave',()=>dropZone.classList.remove('over'));
+dropZone.addEventListener('drop',e=>{
+  e.preventDefault();dropZone.classList.remove('over');
+  const files=[...e.dataTransfer.files].filter(f=>f.type.startsWith('image/'));
+  if(files.length)importImages(files);});
+document.addEventListener('paste',e=>{
+  const files=[...(e.clipboardData?.items||[])].filter(i=>i.type.startsWith('image/')).map(i=>i.getAsFile()).filter(Boolean);
+  if(files.length)importImages(files);});
+
+state=freshState();
+init();
+</script>
+</body>
+</html>

@@ -166,11 +166,12 @@
     <h2>6 · Results</h2>
     <div id="resultsWrap"><p class="hint">Import a round (or enter scores) and results appear here.</p></div>
     <div class="bar" id="saveBar" style="display:none">
-      <button onclick="saveRound()">💾 Save this round</button>
+      <button onclick="saveRound(false)">💾 <span id="saveBtnLabel">Save this round</span></button>
+      <button class="ghost small" id="saveAsNewBtn" style="display:none" onclick="saveRound(true)">Save as a new round</button>
     </div>
   </section>
 
-  <p class="footer-note">All pools zero-sum: what winners collect equals what the group put in. Robin settles directly between players at the $/point rate on point differences. If screenshot import can't start (no internet or a blocked network), scores can always be entered by hand.<br><b>v11</b> — saved rounds (stored on your device; save from Results, reopen anytime) · signed zero-sum Robin points</p>
+  <p class="footer-note">All pools zero-sum: what winners collect equals what the group put in. Robin settles directly between players at the $/point rate on point differences. If screenshot import can't start (no internet or a blocked network), scores can always be entered by hand.<br><b>v12</b> — saved rounds keep every round (no more overwriting; duplicate names get numbered) · signed zero-sum Robin points</p>
 </main>
 
 <script>
@@ -530,7 +531,7 @@ function renderResults(){
   const wrap=document.getElementById('resultsWrap');
   const anyScore=state.players.some(p=>state.scores[p.id]&&state.scores[p.id].some(s=>s.strokes!=null));
   const sb=document.getElementById('saveBar');
-  if(sb)sb.style.display=anyScore?'':'none';
+  if(sb){sb.style.display=anyScore?'':'none';if(anyScore)updateSaveBar();}
   if(!anyScore){wrap.innerHTML='<p class="hint">Import a round (or enter scores) and results appear here.</p>';return;}
   const round={
     holes:state.holes,players:state.players,scores:state.scores,
@@ -644,6 +645,7 @@ function resetAll(){
   if(!confirmReset())return;
   state=freshState();customPairs=false;
   document.getElementById('importStatus').innerHTML='';
+  startNewRound();
   init();
 }
 let resetArmed=false;
@@ -686,6 +688,7 @@ function loadSample(){
   state.ctpWinners={};
   par3s.forEach((hi,k)=>{if(rng()>0.25)state.ctpWinners[hi]=state.players[Math.floor(rng()*4)].id;});
   customPairs=false;
+  startNewRound();
   init();
   alertBar('Sample round loaded — scroll down to see the payouts.');
 }
@@ -1202,6 +1205,7 @@ function applyImport(results){
   });
   state.ctpWinners={};
   customPairs=false;
+  startNewRound(); // a freshly imported card is a new round, never an overwrite of the last saved one
   scOpen=Object.values(state.flags).some(f=>Object.keys(f).length>0);
   // Robin variable availability
   const anyPutts=players.some(p=>p.putts.some(v=>v!=null));
@@ -1228,9 +1232,42 @@ function applyImport(results){
 
 /* ===================== SAVED ROUNDS ===================== */
 const STORE_KEY='gbRounds';
+let loadedId=null; // id of the saved round currently open (null = this is a new, unsaved round)
+function newRoundId(){return 'r'+Date.now().toString(36)+Math.random().toString(36).slice(2,7);}
 function storeOK(){try{localStorage.setItem('__gbt','1');localStorage.removeItem('__gbt');return true;}catch(e){return false;}}
-function loadStore(){try{return JSON.parse(localStorage.getItem(STORE_KEY)||'[]');}catch(e){return[];}}
+function loadStore(){
+  let arr;
+  try{arr=JSON.parse(localStorage.getItem(STORE_KEY)||'[]');}catch(e){return[];}
+  if(!Array.isArray(arr))return[];
+  arr=arr.filter(r=>r&&typeof r==='object');
+  // migrate rounds saved before ids existed
+  let changed=false;
+  arr.forEach(r=>{if(!r.id){r.id=newRoundId();changed=true;}});
+  if(changed){try{saveStore(arr);}catch(e){}}
+  return arr;
+}
 function saveStore(arr){localStorage.setItem(STORE_KEY,JSON.stringify(arr));}
+function uniqueRoundName(name,arr,keepId){
+  const taken=new Set(arr.filter(r=>r.id!==keepId).map(r=>r.name));
+  if(!taken.has(name))return name;
+  let n=2;while(taken.has(name+' ('+n+')'))n++;
+  return name+' ('+n+')';
+}
+function defaultRoundName(){
+  return new Date().toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'})+' round';
+}
+function updateSaveBar(){
+  const lbl=document.getElementById('saveBtnLabel');const asNew=document.getElementById('saveAsNewBtn');
+  if(!lbl||!asNew)return;
+  const cur=loadedId?loadStore().find(r=>r.id===loadedId):null;
+  if(cur){lbl.textContent='Update "'+cur.name+'"';asNew.style.display='';}
+  else{lbl.textContent='Save this round';asNew.style.display='none';}
+}
+function startNewRound(){ // called whenever the app loads a different round's data
+  loadedId=null;
+  const el=document.getElementById('roundName');if(el)el.value='';
+  updateSaveBar();
+}
 function buildSummary(){
   const round={holes:state.holes,players:state.players,scores:state.scores,segments:state.segments,ctpWinners:state.ctpWinners,bets:getBets(),payoutSplits:getSplits(),robinVars:getRobinVars()};
   const r=computeAll(round);const G=getGames();
@@ -1238,12 +1275,17 @@ function buildSummary(){
   state.players.forEach(p=>{tot[p.name]=round2((G.robin?(r.robinPay.net[p.id]||0):0)+(G.medal?(r.medal.net[p.id]||0):0)+(G.ctp?(r.ctp.net[p.id]||0):0));});
   return tot;
 }
-function saveRound(){
+function saveRound(asNew){
   if(!storeOK()){alertBar('Saving isn\'t available in this view — open the app at your golf-betting link to save rounds.');return;}
-  const name=(document.getElementById('roundName').value||'').trim()||new Date().toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'})+' round';
+  const arr=loadStore();
+  // Only overwrite the round you actually have open (and only when you didn't ask for a copy).
+  const i=(asNew||!loadedId)?-1:arr.findIndex(r=>r.id===loadedId);
+  const id=i>=0?arr[i].id:newRoundId();
+  let name=(document.getElementById('roundName').value||'').trim()||defaultRoundName();
+  name=uniqueRoundName(name,arr,id);
   document.getElementById('roundName').value=name;
   const snap={
-    name,savedAt:Date.now(),
+    id,name,savedAt:Date.now(),
     customPairs,
     state:JSON.parse(JSON.stringify({players:state.players,nextId:state.nextId,holes:state.holes,scores:state.scores,segments:state.segments,ctpWinners:state.ctpWinners,flags:state.flags})),
     ui:{
@@ -1253,21 +1295,24 @@ function saveRound(){
     },
     summary:buildSummary(),
   };
-  const arr=loadStore();
-  const i=arr.findIndex(r=>r.name===name);
   if(i>=0)arr[i]=snap;else arr.unshift(snap);
   try{saveStore(arr);}catch(e){alertBar('Couldn\'t save — storage is full. Delete an old round first.');return;}
-  renderSaved();
-  alertBar(`Saved "${name}" ✓`);
+  loadedId=id;
+  renderSaved();updateSaveBar();
+  alertBar(i>=0?`Updated "${name}" ✓`:`Saved "${name}" ✓ — ${arr.length} round${arr.length>1?'s':''} stored`);
 }
 let delArmed=null;
-function deleteRound(i){
-  if(delArmed!==i){delArmed=i;setTimeout(()=>{delArmed=null;},2500);alertBar('Tap Delete again to confirm.');return;}
+function deleteRound(id){
+  if(delArmed!==id){delArmed=id;setTimeout(()=>{delArmed=null;},2500);alertBar('Tap Delete again to confirm.');return;}
   delArmed=null;
-  const arr=loadStore();arr.splice(i,1);saveStore(arr);renderSaved();
+  const arr=loadStore();const i=arr.findIndex(r=>r.id===id);if(i<0)return;
+  arr.splice(i,1);saveStore(arr);
+  if(loadedId===id)loadedId=null;
+  renderSaved();updateSaveBar();
 }
-function loadRound(i){
-  const r=loadStore()[i];if(!r)return;
+function loadRound(id){
+  const arr=loadStore();
+  const r=arr.find(x=>x.id===id);if(!r)return;
   state=freshState();
   Object.assign(state,JSON.parse(JSON.stringify(r.state)));
   state.flags=state.flags||{};
@@ -1287,8 +1332,10 @@ function loadRound(i){
   document.getElementById('rv-comb').checked=!!r.ui.robinVars.combined;
   document.getElementById('rv-putts').checked=!!r.ui.robinVars.putts;
   scOpen=false;
+  loadedId=r.id;
   onGamesChange();
   init();
+  updateSaveBar();
   alertBar(`Loaded "${r.name}"`);
   document.getElementById('resultsWrap').scrollIntoView({behavior:'smooth'});
 }
@@ -1298,12 +1345,13 @@ function renderSaved(){
   const arr=loadStore();
   if(!arr.length){card.style.display='none';return;}
   card.style.display='';
-  document.getElementById('savedList').innerHTML=arr.map((r,i)=>{
+  document.getElementById('savedList').innerHTML=arr.map(r=>{
     const d=new Date(r.savedAt);
     const sum=Object.entries(r.summary||{}).sort((a,b)=>b[1]-a[1]).map(([n,v])=>`${esc(n)} ${v>0?'+':(v<0?'−':'')}$${Math.abs(v)}`).join(' · ');
+    const open=r.id===loadedId?' <span class="ok">• open</span>':'';
     return `<div class="seg" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
-      <div><b>${esc(r.name)}</b> <span class="hint" style="display:inline;margin:0">— ${d.toLocaleDateString()} · ${r.state.players.length} players</span><br><span class="hint" style="display:inline;margin:0">${sum}</span></div>
-      <div class="bar" style="margin:0"><button class="small" onclick="loadRound(${i})">Open</button><button class="ghost small" onclick="deleteRound(${i})">Delete</button></div>
+      <div><b>${esc(r.name)}</b>${open} <span class="hint" style="display:inline;margin:0">— ${d.toLocaleDateString()} · ${(r.state&&r.state.players?r.state.players.length:0)} players</span><br><span class="hint" style="display:inline;margin:0">${sum}</span></div>
+      <div class="bar" style="margin:0"><button class="small" onclick="loadRound('${r.id}')">Open</button><button class="ghost small" onclick="deleteRound('${r.id}')">Delete</button></div>
     </div>`;
   }).join('');
 }

@@ -171,7 +171,7 @@
     </div>
   </section>
 
-  <p class="footer-note">All pools zero-sum: what winners collect equals what the group put in. Robin settles directly between players at the $/point rate on point differences. If screenshot import can't start (no internet or a blocked network), scores can always be entered by hand.<br><b>v13</b> — import can no longer invent a phantom player from a stats row (max 4 per screenshot) · picking one Robin couple auto-fills the other</p>
+  <p class="footer-note">All pools zero-sum: what winners collect equals what the group put in. Robin settles directly between players at the $/point rate on point differences. If screenshot import can't start (no internet or a blocked network), scores can always be entered by hand.<br><b>v14</b> — self-verifying import: fairways &amp; greens checked against the card's printed totals, dots cross-checked between players, per-player ✓/⚠ summary · Robin warns loudly when a variable is skipped for missing data</p>
 </main>
 
 <script>
@@ -200,6 +200,8 @@ function computeRobin(round){
   const V=round.robinVars||{fir:true,gir:true,low:true,combined:true,putts:true};
   const pts={};round.players.forEach(p=>{pts[p.id]=0;});
   const detail=[];
+  // holes where an ENABLED variable had to be skipped for missing data — surfaced loudly in results
+  const skipped={fir:0,gir:0,putts:0,holes:0};
   for(const seg of round.segments){
     const segDetail={holes:seg.holes,pairs:[]};
     const groups=seg.groups&&seg.groups.length?seg.groups:chunkPairsIntoGroups(seg.pairs.length);
@@ -218,14 +220,14 @@ function computeRobin(round){
             combined:sum(ss.map(s=>s.strokes-(s.dots||0))),
             putts:ss.every(s=>s.putts!=null)?sum(ss.map(s=>s.putts)):null};});
         const valid=metrics.filter(m=>m.valid);
-        if(valid.length<2)continue;
+        if(valid.length<2){skipped.holes++;continue;}
         // count variable wins per pair on this hole, then award only the DIFFERENCE to the leading pair
         const wins=new Map();valid.forEach(m=>wins.set(m.pi,0));
-        if(V.fir&&!isPar3&&valid.every(m=>m.fir!=null))tallyWin(valid,'fir',wins,true);
-        if(V.gir&&valid.every(m=>m.gir!=null))tallyWin(valid,'gir',wins,true);
+        if(V.fir&&!isPar3){if(valid.every(m=>m.fir!=null))tallyWin(valid,'fir',wins,true);else skipped.fir++;}
+        if(V.gir){if(valid.every(m=>m.gir!=null))tallyWin(valid,'gir',wins,true);else skipped.gir++;}
         if(V.low)tallyWin(valid,'low',wins,false);
         if(V.combined)tallyWin(valid,'combined',wins,false);
-        if(V.putts&&valid.every(m=>m.putts!=null))tallyWin(valid,'putts',wins,false);
+        if(V.putts){if(valid.every(m=>m.putts!=null))tallyWin(valid,'putts',wins,false);else skipped.putts++;}
         const entries=[...wins.entries()].sort((a,b)=>b[1]-a[1]);
         if(entries.length>=2&&entries[0][1]>entries[1][1]){
           const d=entries[0][1]-entries[1][1];
@@ -236,7 +238,7 @@ function computeRobin(round){
       segDetail.pairs.push({pair:[...pair],points:pairPts[pi]});
       for(const pid of pair)pts[pid]+=pairPts[pi];});
     detail.push(segDetail);}
-  return{points:pts,detail};
+  return{points:pts,detail,skipped};
   // Every variable is head-to-head between the pairs on each hole; ties push.
   // higherBetter: fairways/greens count (more is better); others lower is better.
   // Per hole, each pair's variable wins are tallied and only the net difference scores.
@@ -479,7 +481,7 @@ function renderScorecard(){
       const s=state.scores[p.id][hi];
       const p3=h.par===3;
       html+=`<td><input class="score-in ${isFlagged(p.id,hi,'strokes')?'flagged':''}" type="number" min="1" value="${s.strokes??''}" onchange="setScore('${p.id}',${hi},'strokes',this.value)"></td>
-        <td><input class="score-in" style="width:34px" type="number" min="0" max="4" value="${s.dots||0}" onchange="setScore('${p.id}',${hi},'dots',this.value)"></td>
+        <td><input class="score-in ${isFlagged(p.id,hi,'dots')?'flagged':''}" style="width:34px" type="number" min="0" max="4" value="${s.dots||0}" onchange="setScore('${p.id}',${hi},'dots',this.value)"></td>
         <td><input class="score-in ${isFlagged(p.id,hi,'putts')?'flagged':''}" type="number" min="0" value="${s.putts??''}" onchange="setScore('${p.id}',${hi},'putts',this.value)"></td>
         <td>${p3?'—':`<input class="cb" type="checkbox" ${s.fir?'checked':''} onchange="setScore('${p.id}',${hi},'fir',this.checked)">`}</td>
         <td><input class="cb" type="checkbox" ${s.gir?'checked':''} onchange="setScore('${p.id}',${hi},'gir',this.checked)"></td>`;
@@ -581,6 +583,13 @@ function renderResults(){
   const V=round.robinVars;
   const offVars=[['fir','fairways'],['gir','greens'],['low','low ball'],['combined','combined'],['putts','putts']].filter(([k])=>!V[k]).map(([,n])=>n);
   html+=`<h3>🐦 Robin — $${round.bets.robinPerPoint}/point${offVars.length?` <span class="pill warn">off: ${offVars.join(', ')}</span>`:''}</h3>`;
+  const sk=r.robin.skipped||{};
+  const skMsgs=[];
+  if(sk.holes)skMsgs.push(`${sk.holes} hole${sk.holes>1?'s':''} skipped entirely (missing scores)`);
+  if(sk.fir)skMsgs.push(`fairways not counted on ${sk.fir} hole${sk.fir>1?'s':''}`);
+  if(sk.gir)skMsgs.push(`greens not counted on ${sk.gir} hole${sk.gir>1?'s':''}`);
+  if(sk.putts)skMsgs.push(`putts not counted on ${sk.putts} hole${sk.putts>1?'s':''}`);
+  if(skMsgs.length)html+=`<p class="hint" style="margin:4px 0"><span class="pill warn">⚠ ${skMsgs.join(' · ')} — someone is missing data. Fill it in the scorecard or re-import their stats screenshot, or these points stay uncounted.</span></p>`;
   html+='<div>'+[...state.players].sort((a,b)=>(r.robin.points[b.id]||0)-(r.robin.points[a.id]||0)).map(p=>`<span class="pill">${esc(p.name)}: ${r.robin.points[p.id]||0} pts</span>`).join('')+'</div>';
   r.robin.detail.forEach(seg=>{
     if(!seg.holes.length)return;
@@ -865,6 +874,21 @@ function repairRange(cells,i0,i1,target){
   cells.slice(i0,i1).forEach(c=>{c.flag=true;});}
 
 function num(t){return /^\d+$/.test(t);}
+// Cross-check the icon reads against the totals the card prints itself ("3/7" fairways, GIR %).
+// A mismatch marks that player's stat as suspect instead of silently feeding bad data to Robin.
+function checkIcons(row){
+  row.statChecks=[];
+  const hits=(arr,a,b)=>{let n=0;for(let i=a;i<b&&i<arr.length;i++)if(arr[i]==='green')n++;return n;};
+  const add=(stat,nine,read,card)=>{if(card!=null)row.statChecks.push({stat,nine,read,card,ok:read===card});};
+  if(row.drv){
+    add('fw','front',hits(row.drv,0,9),row.fwOutCard);
+    if(row.drv.length>9)add('fw','back',hits(row.drv,9,18),row.fwInCard);
+  }
+  if(row.girIcons){
+    add('gir','front',hits(row.girIcons,0,9),row.girOutCard);
+    if(row.girIcons.length>9)add('gir','back',hits(row.girIcons,9,18),row.girInCard);
+  }
+}
 // Stat-row labels are matched on letters only (OCR often adds stray punctuation like "Putts." or "PUTTS|"),
 // so a misread label can never turn a stats row into a phantom player.
 function statNorm(t){return String(t).replace(/[^A-Za-z]/g,'').toUpperCase();}
@@ -963,6 +987,10 @@ function parseAnchorsFromWords(words,fallback){
     if(!anchor)return null;
     const c=words.filter(w=>num(w.text)&&Math.abs(w.x-anchor.x)<50&&Math.abs(w.y-rowY)<30)[0];
     return c?parseInt(c.text):null;};
+  const grabTok=(rowY,anchor,re)=>{
+    if(!anchor)return null;
+    const c=words.filter(w=>re.test(w.text)&&Math.abs(w.x-anchor.x)<60&&Math.abs(w.y-rowY)<30)[0];
+    return c?c.text.match(re):null;};
   const playerRows=capFoursome(clusters.filter(c=>c.words.length>=2).map(c=>{
     const cand=words.filter(w=>w.x<holeCols[0]-40&&w.y>c.y-80&&w.y<c.y+40&&/^[A-Za-zÀ-ÿ'.-]{2,}$/.test(w.text)&&!isStatWord(w.text));
     // group candidate words into lines by y, prefer real words (3+ chars), take the best line
@@ -992,8 +1020,20 @@ function parseAnchorsFromWords(words,fallback){
     const owner=[...playerRows].filter(p=>p.y<lab.y&&lab.y-p.y<320).sort((a,b)=>b.y-a.y)[0];
     if(!owner)continue;
     if(isPuttsL(lab.text)){owner.puttsY=lab.y;owner.puttsOut=grab(lab.y,outW);owner.puttsIn=grab(lab.y,inW);owner.puttsTot=grab(lab.y,totalW);}
-    else if(isDrivingL(lab.text))owner.drivingY=lab.y;
-    else if(isGirL(lab.text))owner.girY=lab.y;}
+    else if(isDrivingL(lab.text)){
+      owner.drivingY=lab.y;
+      // the card prints its own fairway totals ("3/7") — read them for cross-checking
+      const fo=grabTok(lab.y,outW,/^(\d)\s*\/\s*\d$/),fi=grabTok(lab.y,inW,/^(\d)\s*\/\s*\d$/);
+      if(fo)owner.fwOutCard=+fo[1];
+      if(fi)owner.fwInCard=+fi[1];
+    }
+    else if(isGirL(lab.text)){
+      owner.girY=lab.y;
+      // GIR row prints per-nine percentages — hits = round(pct * 9 / 100)
+      const go=grabTok(lab.y,outW,/^(\d{1,3})%$/),gi=grabTok(lab.y,inW,/^(\d{1,3})%$/);
+      if(go)owner.girOutCard=Math.round(+go[1]*9/100);
+      if(gi)owner.girInCard=Math.round(+gi[1]*9/100);
+    }}
   if(!playerRows.length)throw new Error('No player rows found on this screenshot.');
   const sumX={out:outW&&outW.x,inn:inW&&inW.x,total:totalW&&totalW.x,hcp:hcpW&&hcpW.x,net:netW&&netW.x};
   return{holeCols,pars,playerRows,pitch,sumX};
@@ -1013,6 +1053,7 @@ function parseRowsWithFallback(words,fb){
     else clusters.push({y:w.y,words:[w]});}
   const grabIn=(list,ax)=>{const c=list.filter(w=>Math.abs(w.x-ax)<50)[0];return c?parseInt(c.text):null;};
   const grab=(rowY,ax)=>{if(ax==null)return null;const c=words.filter(w=>num(w.text)&&Math.abs(w.x-ax)<50&&Math.abs(w.y-rowY)<30)[0];return c?parseInt(c.text):null;};
+  const grabTok=(rowY,ax,re)=>{if(ax==null)return null;const c=words.filter(w=>re.test(w.text)&&Math.abs(w.x-ax)<60&&Math.abs(w.y-rowY)<30)[0];return c?c.text.match(re):null;};
   const playerRows=capFoursome(clusters.filter(c=>c.words.length>=2).map(c=>{
     const cand=words.filter(w=>w.x<holeCols[0]-40&&w.y>c.y-80&&w.y<c.y+40&&/^[A-Za-zÀ-ÿ'.-]{2,}$/.test(w.text)&&!isStatWord(w.text));
     const lines=[];
@@ -1036,8 +1077,18 @@ function parseRowsWithFallback(words,fb){
     const owner=[...playerRows].filter(p=>p.y<lab.y&&lab.y-p.y<320).sort((a,b)=>b.y-a.y)[0];
     if(!owner)continue;
     if(isPuttsL2(lab.text)){owner.puttsY=lab.y;owner.puttsOut=grab(lab.y,sumX.out);owner.puttsIn=grab(lab.y,sumX.inn);owner.puttsTot=grab(lab.y,sumX.total);}
-    else if(isDrivingL2(lab.text))owner.drivingY=lab.y;
-    else if(isGirL2(lab.text))owner.girY=lab.y;}
+    else if(isDrivingL2(lab.text)){
+      owner.drivingY=lab.y;
+      const fo=grabTok(lab.y,sumX.out,/^(\d)\s*\/\s*\d$/),fi=grabTok(lab.y,sumX.inn,/^(\d)\s*\/\s*\d$/);
+      if(fo)owner.fwOutCard=+fo[1];
+      if(fi)owner.fwInCard=+fi[1];
+    }
+    else if(isGirL2(lab.text)){
+      owner.girY=lab.y;
+      const go=grabTok(lab.y,sumX.out,/^(\d{1,3})%$/),gi=grabTok(lab.y,sumX.inn,/^(\d{1,3})%$/);
+      if(go)owner.girOutCard=Math.round(+go[1]*9/100);
+      if(gi)owner.girInCard=Math.round(+gi[1]*9/100);
+    }}
   if(!playerRows.length)throw new Error('No player rows found on this screenshot.');
   return{holeCols,pars:fb.pars,playerRows,pitch,sumX};
 }
@@ -1169,6 +1220,7 @@ async function importImages(files){
         }
         if(row.drivingY)row.drv=A.holeCols.map(cx=>cellIcon(px,W,H,cx,row.drivingY,halfW,18));
         if(row.girY)row.girIcons=A.holeCols.map(cx=>cellIcon(px,W,H,cx,row.girY,halfW,18));
+        checkIcons(row);
       }
       imported.push(A);
       const names=A.playerRows.map(r=>r.name).join(', ');
@@ -1204,6 +1256,7 @@ function applyImport(results){
         if(c.value!=null){p.putts[i]=c.value;if(c.flag)p.flags[i+':putts']=true;else delete p.flags[i+':putts'];}});
       (row.drv||[]).forEach((ic,i)=>{if(ic!=null)p.fir[i]=(ic==='green');});
       (row.girIcons||[]).forEach((ic,i)=>{if(ic!=null)p.gir[i]=(ic==='green');});
+      if(row.statChecks&&row.statChecks.length)p.statChecks=(p.statChecks||[]).concat(row.statChecks);
       if(row.dots&&row.cells&&row.cells.some(c=>c.value!=null)){
         p.dots=p.dots||Array(nHoles).fill(null);
         row.dots.forEach((d,i)=>{p.dots[i]=d;});
@@ -1213,6 +1266,22 @@ function applyImport(results){
   // backstop: never let a misread stats row through as a player
   for(let i=players.length-1;i>=0;i--)if(isStatName(players[i].name))players.splice(i,1);
   if(!players.length)return;
+  // Handicap dots must be consistent across players: with hcp A ≤ hcp B, A can never
+  // have more dots than B on any hole (all dot patterns come from the same stroke index).
+  const dotBad={}; // player index -> Set of hole indexes with an impossible dot combination
+  const wd=players.map((p,i)=>({p,i})).filter(x=>x.p.dots&&x.p.hcp!=null);
+  for(let ai=0;ai<wd.length;ai++)for(let bi=ai+1;bi<wd.length;bi++){
+    const a=wd[ai],b=wd[bi];
+    const lo=a.p.hcp<=b.p.hcp?a:b, hi=lo===a?b:a;
+    for(let h=0;h<nHoles;h++){
+      const dl=lo.p.dots[h],dh=hi.p.dots[h];
+      if(dl==null||dh==null)continue;
+      if(dl>dh||(lo.p.hcp===hi.p.hcp&&dl!==dh)){
+        (dotBad[a.i]=dotBad[a.i]||new Set()).add(h);
+        (dotBad[b.i]=dotBad[b.i]||new Set()).add(h);
+      }
+    }
+  }
   // build state
   state=freshState();
   state.holes=Array.from({length:nHoles},(_,i)=>({number:i+1,par:(pars&&pars[i])||4}));
@@ -1230,11 +1299,16 @@ function applyImport(results){
     }));
     state.flags[pid]={};
     Object.keys(p.flags).forEach(k=>{state.flags[pid][k]=true;});
+    if(dotBad[i])for(const h of dotBad[i])state.flags[pid][h+':dots']=true;
   });
   state.ctpWinners={};
   customPairs=false;
   startNewRound(); // a freshly imported card is a new round, never an overwrite of the last saved one
-  scOpen=Object.values(state.flags).some(f=>Object.keys(f).length>0);
+  const statWarns=[];
+  players.forEach(p=>{(p.statChecks||[]).forEach(c=>{
+    if(!c.ok)statWarns.push(`${p.name}: ${c.stat==='fw'?'fairways':'greens'} read as ${c.read} on the ${c.nine} nine but the card says ${c.card} — check the ${c.stat==='fw'?'FW':'GR'} boxes there`);
+  });});
+  scOpen=Object.values(state.flags).some(f=>Object.keys(f).length>0)||statWarns.length>0;
   // Robin variable availability
   const anyPutts=players.some(p=>p.putts.some(v=>v!=null));
   const anyFir=players.some(p=>p.fir.some(v=>v!=null));
@@ -1250,11 +1324,29 @@ function applyImport(results){
   const noStats=players.filter(p=>!p.putts.some(v=>v!=null)&&!p.fir.some(v=>v!=null)&&!p.gir.some(v=>v!=null)).map(p=>p.name);
   const dotWarns=players.filter(p=>p.hcp!=null&&p.dots&&p.dots.some(d=>d!=null)&&p.dots.reduce((a,d)=>a+(d||0),0)!==p.hcp)
     .map(p=>`${p.name} (dots ${p.dots.reduce((a,d)=>a+(d||0),0)} vs hcp ${p.hcp})`);
+  const dotConflicts=[...new Set(Object.values(dotBad).flatMap(s=>[...s]))].sort((a,b)=>a-b).map(h=>h+1);
+  // per-player verification summary: every category checked against a total printed on the card itself
+  const vsum=players.map((p,i)=>{
+    const pid='p'+(i+1);
+    const fl=state.flags[pid]||{};
+    const has=k=>Object.keys(fl).some(f=>f.endsWith(':'+k));
+    const st=(present,verified,warn)=>warn?'<span class="warn">⚠</span>':(present?(verified?'<span class="ok">✓</span>':'•'):'—');
+    const cfw=(p.statChecks||[]).filter(c=>c.stat==='fw'),cgir=(p.statChecks||[]).filter(c=>c.stat==='gir');
+    const dsum=p.dots?p.dots.reduce((a,d)=>a+(d||0),0):null;
+    return `<b>${esc(p.name)}</b> strokes ${st(p.scores.some(v=>v!=null),!has('strokes'),has('strokes'))}`
+      +` · putts ${st(p.putts.some(v=>v!=null),!has('putts'),has('putts'))}`
+      +` · fairways ${st(p.fir.some(v=>v!=null),cfw.length>0&&cfw.every(c=>c.ok),cfw.some(c=>!c.ok))}`
+      +` · greens ${st(p.gir.some(v=>v!=null),cgir.length>0&&cgir.every(c=>c.ok),cgir.some(c=>!c.ok))}`
+      +` · dots ${st(dsum!=null,p.hcp!=null&&dsum===p.hcp&&!has('dots'),(p.hcp!=null&&dsum!=null&&dsum!==p.hcp)||has('dots'))}`;
+  }).join('<br>');
   const status=document.getElementById('importStatus');
   status.innerHTML+=`<br><span class="ok">Round loaded: ${players.length} player${players.length>1?'s':''}, ${nHoles} holes.</span>`+
     (missing.length?` <span class="warn">No ${missing.join('/')} data found — add the expanded Grint stats screenshots to include them in Robin, or those variables stay off.</span>`:'')+
     (!missing.length&&noStats.length?` <span class="warn">No putts/fairways/greens yet for: ${noStats.map(esc).join(', ')} — add their expanded stats screenshots so Robin counts those points for them.</span>`:'')+
     (dotWarns.length?` <span class="warn">Handicap-stroke dots don't add up for: ${dotWarns.map(esc).join(', ')} — check the • column in the scorecard.</span>`:'')+
+    (dotConflicts.length?` <span class="warn">The dots on hole${dotConflicts.length>1?'s':''} ${dotConflicts.join(', ')} contradict each other between players — check the highlighted • cells.</span>`:'')+
+    statWarns.map(w=>`<br><span class="warn">⚠ ${esc(w)}</span>`).join('')+
+    `<br><span class="hint" style="display:block;margin:6px 0 2px">Checked against the card's own totals — ✓ verified · • read but nothing to check against · ⚠ mismatch · — missing:</span>${vsum}`+
     '<br>Next: check any highlighted cells, confirm the Robin pairings (section 4), and pick the closest-to-the-pin winners (section 5).';
 }
 

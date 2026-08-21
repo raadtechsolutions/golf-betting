@@ -152,7 +152,7 @@
 
   <section class="card" id="cardPairings">
     <h2>4 · Robin pairings</h2>
-    <p class="hint">Default rotation: 1&2 v 3&4 → 1&3 v 2&4 → 1&4 v 2&3 every six holes. Adjust to match who actually played together.</p>
+    <p class="hint">Default rotation: 1&2 v 3&4 → 1&3 v 2&4 → 1&4 v 2&3 every six holes. Pick one couple and the other fills in by itself.</p>
     <div id="pairingsWrap"></div>
   </section>
 
@@ -171,7 +171,7 @@
     </div>
   </section>
 
-  <p class="footer-note">All pools zero-sum: what winners collect equals what the group put in. Robin settles directly between players at the $/point rate on point differences. If screenshot import can't start (no internet or a blocked network), scores can always be entered by hand.<br><b>v12</b> — saved rounds keep every round (no more overwriting; duplicate names get numbered) · signed zero-sum Robin points</p>
+  <p class="footer-note">All pools zero-sum: what winners collect equals what the group put in. Robin settles directly between players at the $/point rate on point differences. If screenshot import can't start (no internet or a blocked network), scores can always be entered by hand.<br><b>v13</b> — import can no longer invent a phantom player from a stats row (max 4 per screenshot) · picking one Robin couple auto-fills the other</p>
 </main>
 
 <script>
@@ -634,7 +634,21 @@ function setScore(pid,hi,key,v){
 }
 function setPairSlot(si,pi,slot,pid){
   customPairs=true;
-  state.segments[si].pairs[pi][slot]=pid;
+  const seg=state.segments[si];
+  const groups=seg.groups&&seg.groups.length?seg.groups:chunkPairsIntoGroups(seg.pairs.length);
+  const g=groups.find(g=>g.includes(pi));
+  // the foursome this pair belongs to, as it stood before the change
+  const groupIds=g?[...new Set(g.flatMap(idx=>seg.pairs[idx]))]:null;
+  seg.pairs[pi][slot]=pid;
+  // Auto-complete: once one couple is set, the other couple of the foursome is the remaining two players.
+  if(g&&g.length===2&&groupIds&&groupIds.length===4&&groupIds.includes(pid)){
+    const ord=state.players.map(p=>p.id);
+    const rem=groupIds.filter(id=>!seg.pairs[pi].includes(id)).sort((a,b)=>ord.indexOf(a)-ord.indexOf(b));
+    if(rem.length===2){
+      const other=g.find(idx=>idx!==pi);
+      seg.pairs[other]=rem;
+    }
+  }
   refresh(['pairings','results']);
 }
 function setCtp(hi,pid){
@@ -851,10 +865,21 @@ function repairRange(cells,i0,i1,target){
   cells.slice(i0,i1).forEach(c=>{c.flag=true;});}
 
 function num(t){return /^\d+$/.test(t);}
-function isPuttsL(t){return /^PUTTS$/i.test(t);}
-function isDrivingL(t){return /^DR.{0,4}ING\|?$/i.test(t)||/^DRIVING$/i.test(t);}
+// Stat-row labels are matched on letters only (OCR often adds stray punctuation like "Putts." or "PUTTS|"),
+// so a misread label can never turn a stats row into a phantom player.
+function statNorm(t){return String(t).replace(/[^A-Za-z]/g,'').toUpperCase();}
+function isPuttsL(t){const s=statNorm(t);return (s.startsWith('PUTT')&&s.length<=7)||['PUTS','PUTIS','PUITS','PUTTS','PUTTES'].includes(s);}
+function isDrivingL(t){const s=statNorm(t);return s.startsWith('DRIV')||/^DR.{1,4}NG$/.test(s);}
 function isGirL(t){const s=String(t).replace(/[^A-Za-z%]/g,'').toUpperCase();return s.startsWith('GIR')||(s.endsWith('R%')&&s.length<=4);}
-function isPenL(t){return /^PENALT/i.test(t);}
+function isPenL(t){return statNorm(t).startsWith('PENAL');}
+function isStatWord(t){return isPuttsL(t)||isDrivingL(t)||isGirL(t)||isPenL(t)||['SCORE','SCORES','HOLE','PAR','OUT','IN','TOTAL','NET','HCP'].includes(statNorm(t));}
+// A "player" whose whole name is made of stat/header words is a misread stats row, not a person.
+function isStatName(name){const ws=String(name).split(/\s+/).filter(Boolean);return ws.length>0&&ws.every(isStatWord);}
+// A Grint card shows at most a foursome: keep the top four rows, drop anything that parsed below them.
+function capFoursome(rows){
+  const clean=rows.filter(r=>!isStatName(r.name));
+  return clean.length>4?clean.slice(0,4):clean;
+}
 function reconcile(r){
   const okT=r.out!=null&&r.inn!=null&&r.total===r.out+r.inn;
   const okN=r.total!=null&&r.hcp!=null&&r.net===r.total-r.hcp;
@@ -938,8 +963,8 @@ function parseAnchorsFromWords(words,fallback){
     if(!anchor)return null;
     const c=words.filter(w=>num(w.text)&&Math.abs(w.x-anchor.x)<50&&Math.abs(w.y-rowY)<30)[0];
     return c?parseInt(c.text):null;};
-  const playerRows=clusters.filter(c=>c.words.length>=2).map(c=>{
-    const cand=words.filter(w=>w.x<holeCols[0]-40&&w.y>c.y-80&&w.y<c.y+40&&/^[A-Za-zÀ-ÿ'.-]{2,}$/.test(w.text)&&!isPuttsL(w.text)&&!isDrivingL(w.text)&&!isGirL(w.text)&&!isPenL(w.text)&&!/^(PAR|HOLE)$/i.test(w.text));
+  const playerRows=capFoursome(clusters.filter(c=>c.words.length>=2).map(c=>{
+    const cand=words.filter(w=>w.x<holeCols[0]-40&&w.y>c.y-80&&w.y<c.y+40&&/^[A-Za-zÀ-ÿ'.-]{2,}$/.test(w.text)&&!isStatWord(w.text));
     // group candidate words into lines by y, prefer real words (3+ chars), take the best line
     const lines=[];
     for(const w of [...cand].sort((a,b)=>a.y-b.y)){
@@ -961,7 +986,7 @@ function parseAnchorsFromWords(words,fallback){
       hcp:grabIn(c.words,hcpW),net:grabIn(c.words,netW),
     };
     reconcile(r);
-    return r;}).sort((a,b)=>a.y-b.y);
+    return r;}).sort((a,b)=>a.y-b.y));
 
   for(const lab of statLabels){
     const owner=[...playerRows].filter(p=>p.y<lab.y&&lab.y-p.y<320).sort((a,b)=>b.y-a.y)[0];
@@ -988,8 +1013,8 @@ function parseRowsWithFallback(words,fb){
     else clusters.push({y:w.y,words:[w]});}
   const grabIn=(list,ax)=>{const c=list.filter(w=>Math.abs(w.x-ax)<50)[0];return c?parseInt(c.text):null;};
   const grab=(rowY,ax)=>{if(ax==null)return null;const c=words.filter(w=>num(w.text)&&Math.abs(w.x-ax)<50&&Math.abs(w.y-rowY)<30)[0];return c?parseInt(c.text):null;};
-  const playerRows=clusters.filter(c=>c.words.length>=2).map(c=>{
-    const cand=words.filter(w=>w.x<holeCols[0]-40&&w.y>c.y-80&&w.y<c.y+40&&/^[A-Za-zÀ-ÿ'.-]{2,}$/.test(w.text)&&!isPuttsL2(w.text)&&!isDrivingL2(w.text)&&!isGirL2(w.text)&&!isPenL2(w.text)&&!/^(PAR|HOLE)$/i.test(w.text));
+  const playerRows=capFoursome(clusters.filter(c=>c.words.length>=2).map(c=>{
+    const cand=words.filter(w=>w.x<holeCols[0]-40&&w.y>c.y-80&&w.y<c.y+40&&/^[A-Za-zÀ-ÿ'.-]{2,}$/.test(w.text)&&!isStatWord(w.text));
     const lines=[];
     for(const w of [...cand].sort((a,b)=>a.y-b.y)){
       const L=lines.find(L=>Math.abs(L.y-w.y)<12);
@@ -1006,7 +1031,7 @@ function parseRowsWithFallback(words,fb){
       out:grabIn(c.words,sumX.out),inn:grabIn(c.words,sumX.inn),total:grabIn(c.words,sumX.total),
       hcp:grabIn(c.words,sumX.hcp),net:grabIn(c.words,sumX.net)};
     reconcile(r);
-    return r;}).sort((a,b)=>a.y-b.y);
+    return r;}).sort((a,b)=>a.y-b.y));
   for(const lab of statLabels){
     const owner=[...playerRows].filter(p=>p.y<lab.y&&lab.y-p.y<320).sort((a,b)=>b.y-a.y)[0];
     if(!owner)continue;
@@ -1185,6 +1210,9 @@ function applyImport(results){
       }
     }
   }
+  // backstop: never let a misread stats row through as a player
+  for(let i=players.length-1;i>=0;i--)if(isStatName(players[i].name))players.splice(i,1);
+  if(!players.length)return;
   // build state
   state=freshState();
   state.holes=Array.from({length:nHoles},(_,i)=>({number:i+1,par:(pars&&pars[i])||4}));

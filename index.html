@@ -171,7 +171,7 @@
     </div>
   </section>
 
-  <p class="footer-note">All pools zero-sum: what winners collect equals what the group put in. Robin settles directly between players at the $/point rate on point differences. If screenshot import can't start (no internet or a blocked network), scores can always be entered by hand.<br><b>v14</b> — self-verifying import: fairways &amp; greens checked against the card's printed totals, dots cross-checked between players, per-player ✓/⚠ summary · Robin warns loudly when a variable is skipped for missing data</p>
+  <p class="footer-note">All pools zero-sum: what winners collect equals what the group put in. Robin settles directly between players at the $/point rate on point differences. If screenshot import can't start (no internet or a blocked network), scores can always be entered by hand.<br><b>v15</b> — player rows must look like players (phantom rows from misread stat labels can't appear); misread stat labels (e.g. GIR%) located from their neighbours instead of dropping the stat · <b>v14</b> — self-verifying import: fairways &amp; greens checked against the card's printed totals, dots cross-checked between players, per-player ✓/⚠ summary · Robin warns loudly when a variable is skipped for missing data</p>
 </main>
 
 <script>
@@ -894,15 +894,58 @@ function checkIcons(row){
 function statNorm(t){return String(t).replace(/[^A-Za-z]/g,'').toUpperCase();}
 function isPuttsL(t){const s=statNorm(t);return (s.startsWith('PUTT')&&s.length<=7)||['PUTS','PUTIS','PUITS','PUTTS','PUTTES'].includes(s);}
 function isDrivingL(t){const s=statNorm(t);return s.startsWith('DRIV')||/^DR.{1,4}NG$/.test(s);}
-function isGirL(t){const s=String(t).replace(/[^A-Za-z%]/g,'').toUpperCase();return s.startsWith('GIR')||(s.endsWith('R%')&&s.length<=4);}
+function isGirL(t){const s=String(t).replace(/[^A-Za-z%]/g,'').toUpperCase();return s.startsWith('GIR')||(s.endsWith('R%')&&s.length<=6)||(/^[A-Z]{2,4}%$/.test(s)&&/IR|LR|IB/.test(s));}
 function isPenL(t){return statNorm(t).startsWith('PENAL');}
 function isStatWord(t){return isPuttsL(t)||isDrivingL(t)||isGirL(t)||isPenL(t)||['SCORE','SCORES','HOLE','PAR','OUT','IN','TOTAL','NET','HCP'].includes(statNorm(t));}
 // A "player" whose whole name is made of stat/header words is a misread stats row, not a person.
 function isStatName(name){const ws=String(name).split(/\s+/).filter(Boolean);return ws.length>0&&ws.every(isStatWord);}
-// A Grint card shows at most a foursome: keep the top four rows, drop anything that parsed below them.
-function capFoursome(rows){
-  const clean=rows.filter(r=>!isStatName(r.name));
+// Structural test (v15): a player row must LOOK like a player, independent of whether its stat labels
+// were OCR'd. Grint prints HCP and NET for every player and never for a stats row; and a strokes total
+// is far bigger than a putts total (33) or a penalties total (2). nHoles=18 → total ≥ 47, per nine ≥ 20.
+function looksLikePlayerRow(r,nHoles){
+  if(r.hcp!=null||r.net!=null)return true;
+  const minTot=Math.round((nHoles||18)*2.6), minNine=Math.round((nHoles||18)*1.1);
+  if(r.total!=null&&r.total>=minTot&&r.total<=(nHoles||18)*9)return true;
+  if(r.out!=null&&r.inn!=null&&r.out>=minNine&&r.inn>=minNine)return true;
+  return false;
+}
+// A Grint card shows at most a foursome: keep the top four rows, drop anything that parsed below them,
+// anything named like a stats row, and anything whose numbers don't look like a scorecard row.
+function capFoursome(rows,nHoles){
+  const clean=rows.filter(r=>!isStatName(r.name)&&looksLikePlayerRow(r,nHoles));
   return clean.length>4?clean.slice(0,4):clean;
+}
+// Stat rows under a player come in a fixed order at an even spacing (PUTTS, DRIVING, GIR%, PENALTIES).
+// When OCR mangles one label (seen: "GIR%" → "ciks"), infer its y from its neighbours instead of
+// dropping that stat for the whole round.
+function inferStatRows(playerRows){
+  const gaps=[];
+  for(const p of playerRows){
+    if(p.puttsY&&p.drivingY)gaps.push(p.drivingY-p.puttsY);
+    if(p.drivingY&&p.girY)gaps.push(p.girY-p.drivingY);
+  }
+  if(!gaps.length)return;
+  gaps.sort((a,b)=>a-b);
+  const gap=gaps[Math.floor(gaps.length/2)];
+  if(!(gap>8))return;
+  for(let i=0;i<playerRows.length;i++){
+    const p=playerRows[i];
+    const next=playerRows[i+1];
+    const okY=y=>y>p.y+gap*0.5&&(!next||y<next.y-gap*0.5);
+    if(p.puttsY&&!p.drivingY&&okY(p.puttsY+gap)){p.drivingY=p.puttsY+gap;p.drivingInferred=true;}
+    if(p.drivingY&&!p.puttsY&&okY(p.drivingY-gap)){p.puttsY=p.drivingY-gap;p.puttsInferred=true;}
+    if(p.drivingY&&!p.girY&&okY(p.drivingY+gap)){p.girY=p.drivingY+gap;p.girInferred=true;}
+    if(p.girY&&!p.drivingY&&okY(p.girY-gap)){p.drivingY=p.girY-gap;p.drivingInferred=true;}
+    if(p.drivingY&&!p.puttsY&&okY(p.drivingY-gap)){p.puttsY=p.drivingY-gap;p.puttsInferred=true;}
+  }
+}
+// For stat rows located by inference (label unreadable), still read the card's printed totals at that y.
+function fillCardTotals(playerRows,tok,nums){
+  for(const p of playerRows){
+    if(p.puttsY&&p.puttsOut==null&&p.puttsIn==null){const[a,b,c]=nums(p.puttsY);p.puttsOut=a;p.puttsIn=b;p.puttsTot=c;}
+    if(p.drivingY&&p.fwOutCard==null&&p.fwInCard==null){const[fo,fi]=tok(p.drivingY,/^(\d)\s*\/\s*\d$/);if(fo)p.fwOutCard=+fo[1];if(fi)p.fwInCard=+fi[1];}
+    if(p.girY&&p.girOutCard==null&&p.girInCard==null){const[go,gi]=tok(p.girY,/^(\d{1,3})%$/);if(go)p.girOutCard=Math.round(+go[1]*9/100);if(gi)p.girInCard=Math.round(+gi[1]*9/100);}
+  }
 }
 function reconcile(r){
   const okT=r.out!=null&&r.inn!=null&&r.total===r.out+r.inn;
@@ -1014,7 +1057,7 @@ function parseAnchorsFromWords(words,fallback){
       hcp:grabIn(c.words,hcpW),net:grabIn(c.words,netW),
     };
     reconcile(r);
-    return r;}).sort((a,b)=>a.y-b.y));
+    return r;}).sort((a,b)=>a.y-b.y),holeCols.length);
 
   for(const lab of statLabels){
     const owner=[...playerRows].filter(p=>p.y<lab.y&&lab.y-p.y<320).sort((a,b)=>b.y-a.y)[0];
@@ -1034,6 +1077,8 @@ function parseAnchorsFromWords(words,fallback){
       if(go)owner.girOutCard=Math.round(+go[1]*9/100);
       if(gi)owner.girInCard=Math.round(+gi[1]*9/100);
     }}
+  inferStatRows(playerRows);
+  fillCardTotals(playerRows,(y,re)=>[grabTok(y,outW,re),grabTok(y,inW,re)],(y)=>[grab(y,outW),grab(y,inW),grab(y,totalW)]);
   if(!playerRows.length)throw new Error('No player rows found on this screenshot.');
   const sumX={out:outW&&outW.x,inn:inW&&inW.x,total:totalW&&totalW.x,hcp:hcpW&&hcpW.x,net:netW&&netW.x};
   return{holeCols,pars,playerRows,pitch,sumX};
@@ -1072,7 +1117,7 @@ function parseRowsWithFallback(words,fb){
       out:grabIn(c.words,sumX.out),inn:grabIn(c.words,sumX.inn),total:grabIn(c.words,sumX.total),
       hcp:grabIn(c.words,sumX.hcp),net:grabIn(c.words,sumX.net)};
     reconcile(r);
-    return r;}).sort((a,b)=>a.y-b.y));
+    return r;}).sort((a,b)=>a.y-b.y),holeCols.length);
   for(const lab of statLabels){
     const owner=[...playerRows].filter(p=>p.y<lab.y&&lab.y-p.y<320).sort((a,b)=>b.y-a.y)[0];
     if(!owner)continue;
@@ -1089,6 +1134,8 @@ function parseRowsWithFallback(words,fb){
       if(go)owner.girOutCard=Math.round(+go[1]*9/100);
       if(gi)owner.girInCard=Math.round(+gi[1]*9/100);
     }}
+  inferStatRows(playerRows);
+  fillCardTotals(playerRows,(y,re)=>[grabTok(y,sumX.out,re),grabTok(y,sumX.inn,re)],(y)=>[grab(y,sumX.out),grab(y,sumX.inn),grab(y,sumX.total)]);
   if(!playerRows.length)throw new Error('No player rows found on this screenshot.');
   return{holeCols,pars:fb.pars,playerRows,pitch,sumX};
 }

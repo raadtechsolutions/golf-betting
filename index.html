@@ -76,13 +76,44 @@
   #importStatus .err { color:var(--red); font-weight:600; }
   .togglerow { display:flex; gap:14px; flex-wrap:wrap; margin:6px 0 2px; }
   .togglerow label { display:flex; align-items:center; gap:5px; font-size:13px; color:var(--ink); margin:0; cursor:pointer; }
+  /* ---- live round (hole-by-hole entry) ---- */
+  .live-head { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+  .live-head .nav { width:52px; height:46px; font-size:22px; padding:0; border-radius:12px; }
+  .live-head .nav:disabled { opacity:.35; cursor:default; }
+  .live-title { text-align:center; flex:1; }
+  .live-title b { font-size:20px; display:block; }
+  .parsel { display:inline-flex; border:1px solid var(--line); border-radius:9px; overflow:hidden; margin-top:4px; }
+  .parsel button { background:#fff; color:var(--ink-soft); border-radius:0; padding:3px 12px; font-size:13px; }
+  .parsel button.on { background:var(--green-700); color:#fff; }
+  .lp { border:1px solid var(--line); border-radius:12px; padding:8px 10px; margin-top:8px; background:#fff; }
+  .lp.done { border-color:var(--green-600); background:var(--green-50); }
+  .lp-name { display:flex; justify-content:space-between; align-items:center; font-weight:700; font-size:15px; }
+  .lp-name small { font-weight:400; color:var(--ink-soft); font-size:12px; }
+  .lp-ctrls { display:flex; gap:8px; flex-wrap:wrap; margin-top:6px; align-items:center; }
+  .stp { display:inline-flex; align-items:center; border:1px solid var(--line); border-radius:10px; overflow:hidden; background:#fff; }
+  .stp button { background:var(--green-100); color:var(--green-900); border-radius:0; width:42px; height:42px; padding:0; font-size:20px; line-height:1; }
+  .stp button:hover { background:var(--green-100); }
+  .stp .val { min-width:44px; text-align:center; font-weight:700; font-size:18px; cursor:pointer; user-select:none; }
+  .stp .val.empty { color:#b5bfb8; font-weight:400; font-size:14px; }
+  .stp .lbl { font-size:11px; color:var(--ink-soft); padding:0 0 0 8px; text-transform:uppercase; letter-spacing:.4px; }
+  .tog { height:42px; padding:0 14px; border-radius:10px; border:1.5px solid var(--line); background:#fff; color:var(--ink-soft); font-weight:700; font-size:14px; }
+  .tog:hover { background:#fff; }
+  .tog.on { background:var(--green-700); color:#fff; border-color:var(--green-700); }
+  .tog.on:hover { background:var(--green-700); }
+  .live-stand { margin-top:14px; border-top:1px solid var(--line); padding-top:10px; }
+  .live-stand table td { font-size:14px; padding:6px 8px; }
+  .live-stand td:first-child { text-align:left; font-weight:600; }
+  .holedots { display:flex; gap:3px; flex-wrap:wrap; margin:8px 0 0; }
+  .holedots span { width:16px; height:16px; border-radius:4px; background:var(--line); font-size:9px; line-height:16px; text-align:center; color:var(--ink-soft); cursor:pointer; }
+  .holedots span.done { background:var(--green-600); color:#fff; }
+  .holedots span.cur { outline:2px solid var(--green-900); outline-offset:1px; }
   @media (max-width:640px){ body{font-size:14px;} input.score-in{width:38px;} }
 </style>
 </head>
 <body>
 <header>
   <h1>⛳ Golf Betting</h1>
-  <p>Drop your Grint screenshots — the app reads them and does the money math.</p>
+  <p>Drop your Grint screenshots — or enter the holes live as you play — and the app does the money math.</p>
 </header>
 <main>
 
@@ -94,6 +125,11 @@
     </div>
     <input type="file" id="fileInput" accept="image/*" multiple style="display:none">
     <div id="importStatus"></div>
+  </section>
+
+  <section class="card" id="liveCard">
+    <h2>Live round — enter as you play</h2>
+    <div id="liveWrap"></div>
   </section>
 
   <section class="card" id="savedCard" style="display:none">
@@ -171,7 +207,7 @@
     </div>
   </section>
 
-  <p class="footer-note">All pools zero-sum: what winners collect equals what the group put in. Robin settles directly between players at the $/point rate on point differences. If screenshot import can't start (no internet or a blocked network), scores can always be entered by hand.<br><b>v15</b> — player rows must look like players (phantom rows from misread stat labels can't appear); misread stat labels (e.g. GIR%) located from their neighbours instead of dropping the stat · <b>v14</b> — self-verifying import: fairways &amp; greens checked against the card's printed totals, dots cross-checked between players, per-player ✓/⚠ summary · Robin warns loudly when a variable is skipped for missing data</p>
+  <p class="footer-note">All pools zero-sum: what winners collect equals what the group put in. Robin settles directly between players at the $/point rate on point differences. If screenshot import can't start (no internet or a blocked network), scores can always be entered by hand.<br><b>v16</b> — live round: enter each hole on the course (strokes, putts, dots, fairway, green, CTP) and see Robin/Medal/CTP money update after every hole; autosaves on the phone and resumes if the page reloads · <b>v15.1</b> — GIR% totals must be a valid ninth (11%, 22%…) or they're ignored; mismatch warnings quote the text actually read · <b>v15</b> — player rows must look like players (phantom rows from misread stat labels can't appear); misread stat labels (e.g. GIR%) located from their neighbours instead of dropping the stat · <b>v14</b> — self-verifying import: fairways &amp; greens checked against the card's printed totals, dots cross-checked between players, per-player ✓/⚠ summary · Robin warns loudly when a variable is skipped for missing data</p>
 </main>
 
 <script>
@@ -530,16 +566,13 @@ function renderCtp(){
   wrap.innerHTML=html;
 }
 function renderResults(){
+  renderLive();
   const wrap=document.getElementById('resultsWrap');
   const anyScore=state.players.some(p=>state.scores[p.id]&&state.scores[p.id].some(s=>s.strokes!=null));
   const sb=document.getElementById('saveBar');
   if(sb){sb.style.display=anyScore?'':'none';if(anyScore)updateSaveBar();}
   if(!anyScore){wrap.innerHTML='<p class="hint">Import a round (or enter scores) and results appear here.</p>';return;}
-  const round={
-    holes:state.holes,players:state.players,scores:state.scores,
-    segments:state.segments,ctpWinners:state.ctpWinners,
-    bets:getBets(),payoutSplits:getSplits(),robinVars:getRobinVars(),
-  };
+  const round=buildRound();
   const r=computeAll(round);
   const G=getGames();
   if(!G.robin&&!G.medal&&!G.ctp){wrap.innerHTML='<p class="hint">No games selected — check at least one game in section 2.</p>';return;}
@@ -548,6 +581,7 @@ function renderResults(){
     gTotal[p.id]=round2((G.robin?(r.robinPay.net[p.id]||0):0)+(G.medal?(r.medal.net[p.id]||0):0)+(G.ctp?(r.ctp.net[p.id]||0):0));
   });
   let html='';
+  if(isLive())html+=`<p class="hint" style="margin:0 0 6px"><span class="pill">⏱ Live — through hole ${playedHoleCount()} of ${state.holes.length}</span> Medal and CTP pools are paid as if the round ended now.</p>`;
   html+='<h3>💰 Who owes what (grand total)</h3><table class="totals-table"><thead><tr><th style="text-align:left">Player</th>'
     +(G.robin?'<th>Robin</th>':'')+(G.medal?'<th>Medal</th>':'')+(G.ctp?'<th>CTP</th>':'')+'<th>Total</th></tr></thead><tbody>';
   const order=[...state.players].sort((a,b)=>(gTotal[b.id]||0)-(gTotal[a.id]||0));
@@ -717,13 +751,225 @@ function loadSample(){
 }
 function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;var t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;}}
 
+/* ===================== LIVE ROUND (hole-by-hole entry) ===================== */
+// state.live = {hole:<index>} while a round is being entered on the course.
+// Everything typed goes straight into state.scores / state.ctpWinners, so the normal
+// scorecard, pairings and results sections stay in sync; the engine simply scores the
+// holes played so far. The round autosaves to localStorage after every tap so a phone
+// reload (or switching apps) never loses it.
+const LIVE_KEY='gbLive';
+function isLive(){return !!(state&&state.live);}
+function lastPlayedHole(){ // highest hole index with any strokes entered, -1 if none
+  let last=-1;
+  state.players.forEach(p=>{(state.scores[p.id]||[]).forEach((s,hi)=>{if(s&&s.strokes!=null&&hi>last)last=hi;});});
+  return last;
+}
+function playedHoleCount(){return lastPlayedHole()+1;}
+function liveSegments(){ // segments trimmed to the holes played so far, so unplayed holes aren't "skipped"
+  const last=lastPlayedHole();
+  return state.segments.map(seg=>({...seg,holes:seg.holes.filter(h=>h<=last)}));
+}
+function buildRound(){
+  return {
+    holes:state.holes,players:state.players,scores:state.scores,
+    segments:isLive()?liveSegments():state.segments,ctpWinners:state.ctpWinners,
+    bets:getBets(),payoutSplits:getSplits(),robinVars:getRobinVars(),
+  };
+}
+function startLive(){
+  const anyScore=state.players.some(p=>(state.scores[p.id]||[]).some(s=>s&&s.strokes!=null));
+  if(anyScore&&!state.live){
+    if(!liveArmed){liveArmed=true;setTimeout(()=>{liveArmed=false;},2500);alertBar('This clears the scores already entered — tap again to start a live round.');return;}
+    liveArmed=false;
+  }
+  state.players.forEach(p=>{state.scores[p.id]=state.holes.map(()=>({strokes:null,putts:null,dots:0,fir:false,gir:false}));});
+  state.ctpWinners={};state.flags={};
+  state.live={hole:0,startedAt:Date.now()};
+  loadedId=null;
+  document.getElementById('importStatus').innerHTML='';
+  if(!(document.getElementById('roundName').value||'').trim())document.getElementById('roundName').value=defaultRoundName();
+  scOpen=false;
+  init();
+  saveLive();
+  document.getElementById('liveCard').scrollIntoView({behavior:'smooth'});
+}
+let liveArmed=false;
+function endLive(){
+  if(!state.live)return;
+  delete state.live;
+  clearLive();
+  init();
+  alertBar('Round finished — results below. Save it to keep it.');
+  document.getElementById('resultsWrap').scrollIntoView({behavior:'smooth'});
+}
+function saveLive(){
+  if(!state.live||!storeOK())return;
+  try{
+    localStorage.setItem(LIVE_KEY,JSON.stringify({
+      customPairs,
+      state:{players:state.players,nextId:state.nextId,holes:state.holes,scores:state.scores,segments:state.segments,ctpWinners:state.ctpWinners,flags:state.flags,live:state.live},
+      ui:{roundName:document.getElementById('roundName').value,bets:getBets(),games:getGames(),robinVars:getRobinVars(),
+          splitSmall:document.getElementById('splitSmall').value,splitLarge:document.getElementById('splitLarge').value},
+    }));
+  }catch(e){}
+}
+function clearLive(){try{localStorage.removeItem(LIVE_KEY);}catch(e){}}
+function restoreLive(){ // on load: pick up a round that was being entered when the page closed
+  if(!storeOK())return false;
+  let r;try{r=JSON.parse(localStorage.getItem(LIVE_KEY)||'null');}catch(e){return false;}
+  if(!r||!r.state||!r.state.live)return false;
+  state=freshState();
+  Object.assign(state,JSON.parse(JSON.stringify(r.state)));
+  state.flags=state.flags||{};
+  customPairs=!!r.customPairs;
+  const u=r.ui||{};
+  if(u.roundName!=null)document.getElementById('roundName').value=u.roundName;
+  if(u.bets){document.getElementById('betMedal').value=u.bets.medalPerPlayer;document.getElementById('betCtp').value=u.bets.ctpPerPlayer;document.getElementById('betRobin').value=u.bets.robinPerPoint;}
+  if(u.splitSmall)document.getElementById('splitSmall').value=u.splitSmall;
+  if(u.splitLarge)document.getElementById('splitLarge').value=u.splitLarge;
+  if(u.games){document.getElementById('g-robin').checked=!!u.games.robin;document.getElementById('g-medal').checked=!!u.games.medal;document.getElementById('g-ctp').checked=!!u.games.ctp;}
+  if(u.robinVars){document.getElementById('rv-fir').checked=!!u.robinVars.fir;document.getElementById('rv-gir').checked=!!u.robinVars.gir;document.getElementById('rv-low').checked=!!u.robinVars.low;document.getElementById('rv-comb').checked=!!u.robinVars.combined;document.getElementById('rv-putts').checked=!!u.robinVars.putts;}
+  scOpen=false;
+  loadedId=null;
+  onGamesChange();
+  return true;
+}
+function liveGo(hi){
+  if(!state.live)return;
+  state.live.hole=Math.max(0,Math.min(state.holes.length-1,hi));
+  renderLive();saveLive();
+  document.getElementById('liveCard').scrollIntoView({behavior:'smooth',block:'start'});
+}
+function liveSet(pid,key,v){ // strokes / putts / dots / fir / gir for the current hole
+  const hi=state.live.hole;const s=state.scores[pid][hi];const par=state.holes[hi].par;
+  if(key==='fir'||key==='gir'){s[key]=!s[key];}
+  else if(key==='dots'){s.dots=((s.dots||0)+1)%4;}
+  else if(key==='strokes'){
+    if(v==='tap')s.strokes=s.strokes==null?par:s.strokes; // tap the number = made par
+    else{const base=s.strokes==null?par:s.strokes;s.strokes=Math.max(1,base+v);}
+  }else if(key==='putts'){
+    if(v==='tap')s.putts=s.putts==null?2:s.putts;
+    else{const base=s.putts==null?2:s.putts;s.putts=Math.max(0,base+v);}
+  }
+  setFlag(pid,hi,key,false);
+  renderResults();renderScorecard();saveLive();
+}
+function liveClear(pid){
+  const hi=state.live.hole;
+  state.scores[pid][hi]={strokes:null,putts:null,dots:0,fir:false,gir:false};
+  renderResults();renderScorecard();saveLive();
+}
+function livePar(par){
+  const hi=state.live.hole;
+  state.holes[hi].par=par;
+  if(par!==3)delete state.ctpWinners[hi];
+  renderScorecard();renderCtp();renderResults();saveLive();
+}
+function liveCtp(pid){
+  const hi=state.live.hole;
+  if(state.ctpWinners[hi]===pid)delete state.ctpWinners[hi];else state.ctpWinners[hi]=pid;
+  renderCtp();renderResults();saveLive();
+}
+function holeComplete(hi){ // every player has strokes (putts optional, but surfaced)
+  return state.players.every(p=>state.scores[p.id][hi]&&state.scores[p.id][hi].strokes!=null);
+}
+function renderLive(){
+  const wrap=document.getElementById('liveWrap');if(!wrap)return;
+  if(!state.live){
+    const n=state.players.length;
+    wrap.innerHTML=`<p class="hint">No Grint screenshot needed during the round: set the players and handicaps in section 2 (and the pairings in section 4 if they're not the default rotation), then enter each hole here as you play. Strokes, putts, handicap dots, fairway and green per player — the money updates after every hole. You can still drop the Grint screenshot at the end to double-check.</p>
+      <div class="bar" style="margin-top:6px"><button onclick="startLive()">▶ Start live round (${n} player${n>1?'s':''})</button></div>`;
+    return;
+  }
+  const hi=state.live.hole;const h=state.holes[hi];const par=h.par;const nH=state.holes.length;
+  const G=getGames();
+  // which pairs play together on this hole (Robin)
+  const seg=state.segments.find(sg=>sg.holes.includes(hi));
+  const pairOf={};
+  if(seg)seg.pairs.forEach((pair,pi)=>{pair.forEach(pid=>{pairOf[pid]=pi;});});
+  const pairLine=seg&&G.robin?seg.pairs.map(pair=>pair.map(pid=>esc(pname(pid))).join(' & ')).join(' <span class="vs">vs</span> '):'';
+  let html=`<div class="live-head">
+    <button class="nav ghost" onclick="liveGo(${hi-1})" ${hi===0?'disabled':''} aria-label="Previous hole">‹</button>
+    <div class="live-title"><b>Hole ${h.number}</b>
+      <div class="parsel">${[3,4,5].map(p=>`<button class="${p===par?'on':''}" onclick="livePar(${p})">Par ${p}</button>`).join('')}</div>
+    </div>
+    <button class="nav ghost" onclick="liveGo(${hi+1})" ${hi>=nH-1?'disabled':''} aria-label="Next hole">›</button>
+  </div>`;
+  if(pairLine)html+=`<p class="hint" style="text-align:center;margin:6px 0 0">${pairLine}</p>`;
+  // per-player entry rows
+  const pairColors=['#276b3d','#8a6d1a','#2b5f8a','#7a3d8a','#b3402f','#2f8049'];
+  state.players.forEach(p=>{
+    const s=state.scores[p.id][hi];
+    const dotsUsed=sum(state.scores[p.id].map(x=>x.dots||0));
+    const pi=pairOf[p.id];
+    const tag=(pi!=null&&G.robin)?`<span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${pairColors[pi%pairColors.length]};margin-right:6px;vertical-align:middle" title="Partner group"></span>`:'';
+    html+=`<div class="lp ${s.strokes!=null?'done':''}">
+      <div class="lp-name"><span>${tag}${esc(p.name)} <small>hcp ${p.handicap||0} · dots used ${dotsUsed}/${p.handicap||0}</small></span>
+        ${s.strokes!=null?`<button class="ghost small" onclick="liveClear('${p.id}')" title="Clear this hole for ${esc(p.name)}">clear</button>`:''}</div>
+      <div class="lp-ctrls">
+        <span class="stp"><span class="lbl">S</span><button onclick="liveSet('${p.id}','strokes',-1)">−</button><span class="val ${s.strokes==null?'empty':''}" onclick="liveSet('${p.id}','strokes','tap')">${s.strokes==null?'par?':s.strokes}</span><button onclick="liveSet('${p.id}','strokes',1)">+</button></span>
+        <span class="stp"><span class="lbl">P</span><button onclick="liveSet('${p.id}','putts',-1)">−</button><span class="val ${s.putts==null?'empty':''}" onclick="liveSet('${p.id}','putts','tap')">${s.putts==null?'2?':s.putts}</span><button onclick="liveSet('${p.id}','putts',1)">+</button></span>
+      </div>
+      <div class="lp-ctrls">
+        <button class="tog ${s.dots?'on':''}" onclick="liveSet('${p.id}','dots')" title="Handicap strokes on this hole (tap to cycle 0-3)">• ${s.dots||0} dot${s.dots===1?'':'s'}</button>
+        ${par===3?'':`<button class="tog ${s.fir?'on':''}" onclick="liveSet('${p.id}','fir')">FW ${s.fir?'✓':''}</button>`}
+        <button class="tog ${s.gir?'on':''}" onclick="liveSet('${p.id}','gir')">GR ${s.gir?'✓':''}</button>
+      </div>
+    </div>`;
+  });
+  if(par===3&&G.ctp){
+    html+=`<div class="lp"><div class="lp-name">🎯 Closest to the pin <small>tap the winner · tap again to clear</small></div><div class="lp-ctrls">`
+      +state.players.map(p=>`<button class="tog ${state.ctpWinners[hi]===p.id?'on':''}" onclick="liveCtp('${p.id}')">${esc(p.name)}</button>`).join('')+'</div></div>';
+  }
+  // missing-data hint + navigation
+  const missingS=state.players.filter(p=>state.scores[p.id][hi].strokes==null).map(p=>p.name);
+  const missingP=state.players.filter(p=>state.scores[p.id][hi].strokes!=null&&state.scores[p.id][hi].putts==null).map(p=>p.name);
+  if(missingS.length)html+=`<p class="hint" style="margin:8px 0 0">Still to enter: ${missingS.map(esc).join(', ')}</p>`;
+  else if(missingP.length&&getRobinVars().putts)html+=`<p class="hint" style="margin:8px 0 0"><span class="pill warn">putts missing for ${missingP.map(esc).join(', ')} — the putts point won't count on this hole</span></p>`;
+  html+=`<div class="holedots">${state.holes.map((x,i)=>`<span class="${holeComplete(i)?'done':''} ${i===hi?'cur':''}" onclick="liveGo(${i})" title="Hole ${x.number}">${x.number}</span>`).join('')}</div>`;
+  html+=`<div class="bar">${hi<nH-1?`<button onclick="liveGo(${hi+1})">Next hole ›</button>`:`<button onclick="endLive()">✓ Finish round</button>`}<button class="ghost" onclick="endLive()">${hi<nH-1?'End round early':'Finish'}</button></div>`;
+  // standings through the last hole played
+  const played=playedHoleCount();
+  html+='<div class="live-stand">';
+  if(!played){html+='<p class="hint" style="margin:0">Standings appear after the first hole.</p>';}
+  else if(!G.robin&&!G.medal&&!G.ctp){html+='<p class="hint" style="margin:0">No games selected (section 2).</p>';}
+  else{
+    const r=computeAll(buildRound());
+    const gTotal={};
+    state.players.forEach(p=>{gTotal[p.id]=round2((G.robin?(r.robinPay.net[p.id]||0):0)+(G.medal?(r.medal.net[p.id]||0):0)+(G.ctp?(r.ctp.net[p.id]||0):0));});
+    const medalRank=Object.fromEntries(r.medal.ranked.map(x=>[x.id,x]));
+    html+=`<h3 style="margin:0 0 6px">💰 Through hole ${played}</h3><table><thead><tr><th style="text-align:left">Player</th>`
+      +(G.robin?'<th>Robin</th>':'')+(G.medal?'<th>Medal</th>':'')+(G.ctp?'<th>CTP</th>':'')+'<th>Total</th></tr></thead><tbody>';
+    [...state.players].sort((a,b)=>(gTotal[b.id]||0)-(gTotal[a.id]||0)).forEach(p=>{
+      const me=r.medal.entries.find(e=>e.id===p.id);const rk=medalRank[p.id];
+      html+=`<tr><td>${esc(p.name)}</td>`
+        +(G.robin?`<td>${money(r.robinPay.net[p.id])}<br><small style="color:var(--ink-soft)">${r.robin.points[p.id]||0} pts</small></td>`:'')
+        +(G.medal?`<td>${money(r.medal.net[p.id])}<br><small style="color:var(--ink-soft)">${me?`${me.gross} gross · ${rk?rk.rank+(rk.tieSize>1?'T':''):'—'}`:'—'}</small></td>`:'')
+        +(G.ctp?`<td>${money(r.ctp.net[p.id])}<br><small style="color:var(--ink-soft)">${r.ctp.wins[p.id]||0} win${(r.ctp.wins[p.id]||0)===1?'':'s'}</small></td>`:'')
+        +`<td><b>${money(gTotal[p.id])}</b></td></tr>`;
+    });
+    html+='</tbody></table>';
+    const sk=r.robin.skipped||{};
+    const skMsgs=[];
+    if(sk.fir)skMsgs.push(`fairways skipped on ${sk.fir} hole${sk.fir>1?'s':''}`);
+    if(sk.gir)skMsgs.push(`greens skipped on ${sk.gir}`);
+    if(sk.putts)skMsgs.push(`putts skipped on ${sk.putts}`);
+    if(sk.holes)skMsgs.push(`${sk.holes} hole${sk.holes>1?'s':''} not scored for everyone`);
+    if(G.robin&&skMsgs.length)html+=`<p class="hint" style="margin:6px 0 0"><span class="pill warn">⚠ ${skMsgs.join(' · ')}</span></p>`;
+    html+=`<p class="hint" style="margin:6px 0 0">Medal and CTP money assume the round ended now; Robin is the points so far at $${getBets().robinPerPoint}/pt. Full breakdown and settle-up in section 6.</p>`;
+  }
+  html+='</div>';
+  wrap.innerHTML=html;
+}
+
 function refresh(parts){
   ensureScores();ensureSegments();
   if(parts.includes('players'))renderPlayers();
   if(parts.includes('scorecard'))renderScorecard();
   if(parts.includes('pairings'))renderPairings();
   if(parts.includes('ctp'))renderCtp();
-  if(parts.includes('results'))renderResults();
+  if(parts.includes('results'))renderResults();else renderLive();
+  if(isLive())saveLive();
 }
 function init(){refresh(['players','scorecard','pairings','ctp','results']);}
 ['betMedal','betCtp','betRobin','splitSmall','splitLarge'].forEach(id=>{
@@ -879,14 +1125,14 @@ function num(t){return /^\d+$/.test(t);}
 function checkIcons(row){
   row.statChecks=[];
   const hits=(arr,a,b)=>{let n=0;for(let i=a;i<b&&i<arr.length;i++)if(arr[i]==='green')n++;return n;};
-  const add=(stat,nine,read,card)=>{if(card!=null)row.statChecks.push({stat,nine,read,card,ok:read===card});};
+  const add=(stat,nine,read,card,raw)=>{if(card!=null)row.statChecks.push({stat,nine,read,card,raw,ok:read===card});};
   if(row.drv){
     add('fw','front',hits(row.drv,0,9),row.fwOutCard);
     if(row.drv.length>9)add('fw','back',hits(row.drv,9,18),row.fwInCard);
   }
   if(row.girIcons){
-    add('gir','front',hits(row.girIcons,0,9),row.girOutCard);
-    if(row.girIcons.length>9)add('gir','back',hits(row.girIcons,9,18),row.girInCard);
+    add('gir','front',hits(row.girIcons,0,9),row.girOutCard,row.girOutRaw);
+    if(row.girIcons.length>9)add('gir','back',hits(row.girIcons,9,18),row.girInCard,row.girInRaw);
   }
 }
 // Stat-row labels are matched on letters only (OCR often adds stray punctuation like "Putts." or "PUTTS|"),
@@ -944,8 +1190,15 @@ function fillCardTotals(playerRows,tok,nums){
   for(const p of playerRows){
     if(p.puttsY&&p.puttsOut==null&&p.puttsIn==null){const[a,b,c]=nums(p.puttsY);p.puttsOut=a;p.puttsIn=b;p.puttsTot=c;}
     if(p.drivingY&&p.fwOutCard==null&&p.fwInCard==null){const[fo,fi]=tok(p.drivingY,/^(\d)\s*\/\s*\d$/);if(fo)p.fwOutCard=+fo[1];if(fi)p.fwInCard=+fi[1];}
-    if(p.girY&&p.girOutCard==null&&p.girInCard==null){const[go,gi]=tok(p.girY,/^(\d{1,3})%$/);if(go)p.girOutCard=Math.round(+go[1]*9/100);if(gi)p.girInCard=Math.round(+gi[1]*9/100);}
+    if(p.girY&&p.girOutCard==null&&p.girInCard==null){const[go,gi]=tok(p.girY,/^(\d{1,3})%$/);if(go){p.girOutCard=girPctToHits(go[1]);p.girOutRaw=go[0];}if(gi){p.girInCard=girPctToHits(gi[1]);p.girInRaw=gi[0];}}
   }
+}
+// Grint's per-nine GIR% is always k/9 (0,11,22,33,44,56,67,78,89,100). Anything else ("1%" for "11%")
+// is an OCR misread: return null so it is ignored instead of becoming a false mismatch. Keeps the raw text too.
+function girPctToHits(txt){
+  const n=+txt; if(!(n>=0&&n<=100))return null;
+  const k=Math.round(n*9/100);
+  return Math.abs(k*100/9-n)<1?k:null;
 }
 function reconcile(r){
   const okT=r.out!=null&&r.inn!=null&&r.total===r.out+r.inn;
@@ -1074,8 +1327,8 @@ function parseAnchorsFromWords(words,fallback){
       owner.girY=lab.y;
       // GIR row prints per-nine percentages — hits = round(pct * 9 / 100)
       const go=grabTok(lab.y,outW,/^(\d{1,3})%$/),gi=grabTok(lab.y,inW,/^(\d{1,3})%$/);
-      if(go)owner.girOutCard=Math.round(+go[1]*9/100);
-      if(gi)owner.girInCard=Math.round(+gi[1]*9/100);
+      if(go){owner.girOutCard=girPctToHits(go[1]);owner.girOutRaw=go[0];}
+      if(gi){owner.girInCard=girPctToHits(gi[1]);owner.girInRaw=gi[0];}
     }}
   inferStatRows(playerRows);
   fillCardTotals(playerRows,(y,re)=>[grabTok(y,outW,re),grabTok(y,inW,re)],(y)=>[grab(y,outW),grab(y,inW),grab(y,totalW)]);
@@ -1131,8 +1384,8 @@ function parseRowsWithFallback(words,fb){
     else if(isGirL2(lab.text)){
       owner.girY=lab.y;
       const go=grabTok(lab.y,sumX.out,/^(\d{1,3})%$/),gi=grabTok(lab.y,sumX.inn,/^(\d{1,3})%$/);
-      if(go)owner.girOutCard=Math.round(+go[1]*9/100);
-      if(gi)owner.girInCard=Math.round(+gi[1]*9/100);
+      if(go){owner.girOutCard=girPctToHits(go[1]);owner.girOutRaw=go[0];}
+      if(gi){owner.girInCard=girPctToHits(gi[1]);owner.girInRaw=gi[0];}
     }}
   inferStatRows(playerRows);
   fillCardTotals(playerRows,(y,re)=>[grabTok(y,sumX.out,re),grabTok(y,sumX.inn,re)],(y)=>[grab(y,sumX.out),grab(y,sumX.inn),grab(y,sumX.total)]);
@@ -1353,7 +1606,7 @@ function applyImport(results){
   startNewRound(); // a freshly imported card is a new round, never an overwrite of the last saved one
   const statWarns=[];
   players.forEach(p=>{(p.statChecks||[]).forEach(c=>{
-    if(!c.ok)statWarns.push(`${p.name}: ${c.stat==='fw'?'fairways':'greens'} read as ${c.read} on the ${c.nine} nine but the card says ${c.card} — check the ${c.stat==='fw'?'FW':'GR'} boxes there`);
+    if(!c.ok)statWarns.push(`${p.name}: ${c.read} ${c.stat==='fw'?'fairway':'green'}${c.read===1?'':'s'} counted on the ${c.nine} nine, but the card's printed total there reads ${c.stat==='fw'?c.card+'/7':`${c.raw||c.card+' greens'} (= ${c.card} green${c.card===1?'':'s'})`} — compare the ${c.stat==='fw'?'FW':'GR'} boxes with the screenshot`);
   });});
   scOpen=Object.values(state.flags).some(f=>Object.keys(f).length>0)||statWarns.length>0;
   // Robin variable availability
@@ -1432,12 +1685,13 @@ function updateSaveBar(){
 }
 function startNewRound(){ // called whenever the app loads a different round's data
   loadedId=null;
+  if(state&&state.live)delete state.live; // an import / saved round / reset replaces any round being entered live
+  clearLive();
   const el=document.getElementById('roundName');if(el)el.value='';
   updateSaveBar();
 }
 function buildSummary(){
-  const round={holes:state.holes,players:state.players,scores:state.scores,segments:state.segments,ctpWinners:state.ctpWinners,bets:getBets(),payoutSplits:getSplits(),robinVars:getRobinVars()};
-  const r=computeAll(round);const G=getGames();
+  const r=computeAll(buildRound());const G=getGames();
   const tot={};
   state.players.forEach(p=>{tot[p.name]=round2((G.robin?(r.robinPay.net[p.id]||0):0)+(G.medal?(r.medal.net[p.id]||0):0)+(G.ctp?(r.ctp.net[p.id]||0):0));});
   return tot;
@@ -1483,6 +1737,7 @@ function loadRound(id){
   state=freshState();
   Object.assign(state,JSON.parse(JSON.stringify(r.state)));
   state.flags=state.flags||{};
+  delete state.live;clearLive();
   customPairs=!!r.customPairs;
   document.getElementById('roundName').value=r.name;
   document.getElementById('betMedal').value=r.ui.bets.medalPerPlayer;
@@ -1538,8 +1793,10 @@ document.addEventListener('paste',e=>{
   if(files.length)importImages(files);});
 
 state=freshState();
-init();
+if(restoreLive()){init();alertBar('Live round resumed — hole '+(state.live.hole+1));}
+else init();
 renderSaved();
+['roundName'].forEach(id=>{document.getElementById(id).addEventListener('input',()=>{if(isLive())saveLive();});});
 </script>
 </body>
 </html>

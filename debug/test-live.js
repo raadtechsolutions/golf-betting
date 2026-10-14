@@ -18,12 +18,31 @@ let fails=0;const ok=(c,m)=>{console.log((c?'PASS ':'FAIL ')+m);if(!c)fails++;};
     state.players=[{id:'p1',name:'Rod',handicap:14},{id:'p2',name:'Jon',handicap:5},{id:'p3',name:'Max',handicap:21},{id:'p4',name:'Leo',handicap:11}];
     init();
   });
+  // tabs
+  ok(await pg.evaluate(()=>getComputedStyle(document.getElementById('importCard')).display==='none'&&getComputedStyle(document.getElementById('liveCard')).display!=='none'),'live tab shown by default, import hidden');
+  await pg.click('#tab-import');
+  ok(await pg.evaluate(()=>getComputedStyle(document.getElementById('importCard')).display!=='none'&&getComputedStyle(document.getElementById('liveCard')).display==='none'),'import tab switches panes');
+  await pg.click('#tab-live');
+  // in-tab player editor
+  ok((await pg.$$('#liveWrap .ped input[type=text]')).length===4,'player editor shows 4 name inputs');
+  await pg.fill('#liveWrap .ped input[type=text] >> nth=0','Rodrigo');
+  await pg.press('#liveWrap .ped input[type=text] >> nth=0','Tab');
+  ok(await pg.evaluate(()=>state.players[0].name==='Rodrigo'&&document.querySelector('#playerGrid input[type=text]').value==='Rodrigo'),'rename in live tab updates state + section 2');
+  await pg.click('#liveWrap .bar button.ghost'); // + Add player
+  ok(await pg.evaluate(()=>state.players.length===5),'add player from live tab');
+  await pg.click('#liveWrap .ped .del >> nth=4');
+  ok(await pg.evaluate(()=>state.players.length===4),'remove player from live tab');
+  await pg.evaluate(()=>{state.players[0].name='Rod';init();});
   ok(await pg.$('#liveWrap button'),'start button rendered');
-  await pg.click('#liveWrap button');
+  await pg.click('#liveWrap .bar button:not(.ghost)');
   ok(await pg.evaluate(()=>state.live&&state.live.hole===0),'live started at hole 1');
   ok((await pg.textContent('.live-title b')).replace(/\s/g,'')==='1st','title shows 1st');
   // Grint-style flow: player rows + Add Score sheet
   ok((await pg.$$('.prow')).length===4,'4 player rows');
+  // mid-round player editor
+  await pg.click('text=✎ Players');
+  ok((await pg.$$('#liveWrap .ped input[type=text]')).length===4,'mid-round editor opens');
+  await pg.click('text=Done');
   await pg.click('.prow:nth-child(1) .addscore');
   ok(await pg.$('#sheet .sheet-panel'),'sheet opens');
   ok((await pg.textContent('#sheet .sheet-name')).startsWith('Rod'),'sheet is for Rod');

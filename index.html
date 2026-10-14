@@ -76,6 +76,14 @@
   #importStatus .err { color:var(--red); font-weight:600; }
   .togglerow { display:flex; gap:14px; flex-wrap:wrap; margin:6px 0 2px; }
   .togglerow label { display:flex; align-items:center; gap:5px; font-size:13px; color:var(--ink); margin:0; cursor:pointer; }
+  .tabs { display:flex; gap:6px; margin-top:16px; background:#e3ece5; padding:4px; border-radius:12px; }
+  .tabs button { flex:1; background:transparent; color:var(--green-900); border-radius:9px; padding:10px 8px; font-size:14px; }
+  .tabs button:hover { background:rgba(255,255,255,.5); }
+  .tabs button.on { background:#fff; box-shadow:0 1px 3px rgba(20,53,31,.15); }
+  .tabpane { margin-top:10px; }
+  .ped { display:grid; grid-template-columns:1fr 78px 36px; gap:8px; align-items:center; margin-top:6px; }
+  .ped input { height:42px; font-size:15px; }
+  .ped .del { font-size:20px; }
   /* ---- live round (hole-by-hole entry) ---- */
   .live-head { display:flex; align-items:center; justify-content:space-between; gap:8px; }
   .live-head .nav { width:52px; height:46px; font-size:22px; padding:0; border-radius:12px; }
@@ -182,19 +190,24 @@
 </header>
 <main>
 
-  <section class="card">
-    <h2>1 · Import from Grint</h2>
+  <div class="tabs" role="tablist">
+    <button id="tab-live" class="on" role="tab" onclick="showTab('live')">✍️ Enter as you play</button>
+    <button id="tab-import" role="tab" onclick="showTab('import')">📷 Import from Grint</button>
+  </div>
+
+  <section class="card tabpane" id="liveCard" data-tab="live">
+    <h2>Enter as you play</h2>
+    <div id="liveWrap"></div>
+  </section>
+
+  <section class="card tabpane" id="importCard" data-tab="import">
+    <h2>Import from Grint</h2>
     <div class="drop" id="dropZone">
       <b>Drop Grint screenshots here — or click to choose</b>
       <span>Scorecard view and/or the expanded stats view (putts · driving · GIR). Add as many screenshots as needed to cover all players; they merge into one round. You can also paste (⌘V) a screenshot.</span>
     </div>
     <input type="file" id="fileInput" accept="image/*" multiple style="display:none">
     <div id="importStatus"></div>
-  </section>
-
-  <section class="card" id="liveCard">
-    <h2>Live round — enter as you play</h2>
-    <div id="liveWrap"></div>
   </section>
 
   <section class="card" id="savedCard" style="display:none">
@@ -272,7 +285,7 @@
     </div>
   </section>
 
-  <p class="footer-note">All pools zero-sum: what winners collect equals what the group put in. Robin settles directly between players at the $/point rate on point differences. If screenshot import can't start (no internet or a blocked network), scores can always be entered by hand.<br><b>v16.1</b> — live round screen redesigned Grint-style: player list with Add Score, score sheet with big Score/Putts steppers, tee-shot pad (HIT or missed direction), green, dots and closest-to-pin; Enter moves to the next player · <b>v16</b> — live round: enter each hole on the course (strokes, putts, dots, fairway, green, CTP) and see Robin/Medal/CTP money update after every hole; autosaves on the phone and resumes if the page reloads · <b>v15.1</b> — GIR% totals must be a valid ninth (11%, 22%…) or they're ignored; mismatch warnings quote the text actually read · <b>v15</b> — player rows must look like players (phantom rows from misread stat labels can't appear); misread stat labels (e.g. GIR%) located from their neighbours instead of dropping the stat · <b>v14</b> — self-verifying import: fairways &amp; greens checked against the card's printed totals, dots cross-checked between players, per-player ✓/⚠ summary · Robin warns loudly when a variable is skipped for missing data</p>
+  <p class="footer-note">All pools zero-sum: what winners collect equals what the group put in. Robin settles directly between players at the $/point rate on point differences. If screenshot import can't start (no internet or a blocked network), scores can always be entered by hand.<br><b>v16.2</b> — two tabs at the top (Enter as you play / Import from Grint); player names and handicaps editable right in the live tab, before and during the round · <b>v16.1</b> — live round screen redesigned Grint-style: player list with Add Score, score sheet with big Score/Putts steppers, tee-shot pad (HIT or missed direction), green, dots and closest-to-pin; Enter moves to the next player · <b>v16</b> — live round: enter each hole on the course (strokes, putts, dots, fairway, green, CTP) and see Robin/Medal/CTP money update after every hole; autosaves on the phone and resumes if the page reloads · <b>v15.1</b> — GIR% totals must be a valid ninth (11%, 22%…) or they're ignored; mismatch warnings quote the text actually read · <b>v15</b> — player rows must look like players (phantom rows from misread stat labels can't appear); misread stat labels (e.g. GIR%) located from their neighbours instead of dropping the stat · <b>v14</b> — self-verifying import: fairways &amp; greens checked against the card's printed totals, dots cross-checked between players, per-player ✓/⚠ summary · Robin warns loudly when a variable is skipped for missing data</p>
 </main>
 
 <script>
@@ -823,6 +836,26 @@ function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;var t=Math.imul(a
 // holes played so far. The round autosaves to localStorage after every tap so a phone
 // reload (or switching apps) never loses it.
 const LIVE_KEY='gbLive';
+let curTab='live';
+function showTab(t){
+  curTab=t;
+  document.querySelectorAll('.tabpane').forEach(el=>{el.style.display=el.dataset.tab===t?'':'none';});
+  document.getElementById('tab-live').classList.toggle('on',t==='live');
+  document.getElementById('tab-import').classList.toggle('on',t==='import');
+  try{localStorage.setItem('gbTab',t);}catch(e){}
+}
+let livePlayersOpen=false;
+function toggleLivePlayers(){livePlayersOpen=!livePlayersOpen;renderLive();}
+function playerEditorHtml(){ // same players as section 2 — edit names / handicaps here without leaving the live tab
+  let h='<div class="ped"><label style="margin:0">Name</label><label style="margin:0">Handicap</label><span></span>';
+  state.players.forEach(p=>{
+    h+=`<input type="text" value="${esc(p.name)}" placeholder="Name" onchange="setName('${p.id}',this.value)">
+        <input type="number" value="${p.handicap}" step="1" inputmode="numeric" onchange="setHcp('${p.id}',this.value)">
+        ${state.players.length>2?`<button class="del" title="Remove" onclick="removePlayer('${p.id}')">✕</button>`:'<span></span>'}`;
+  });
+  h+='</div><div class="bar" style="margin-top:8px"><button class="ghost small" onclick="addPlayer()">+ Add player</button></div>';
+  return h;
+}
 function isLive(){return !!(state&&state.live);}
 function lastPlayedHole(){ // highest hole index with any strokes entered, -1 if none
   let last=-1;
@@ -1041,8 +1074,9 @@ function renderLive(){
   renderSheet();
   if(!state.live){
     const n=state.players.length;
-    wrap.innerHTML=`<p class="hint">No Grint screenshot needed during the round: set the players and handicaps in section 2 (and the pairings in section 4 if they're not the default rotation), then enter each hole here as you play — tap a player, set score, putts, tee shot and green, Enter. The money updates after every hole. You can still drop the Grint screenshot at the end to double-check.</p>
-      <div class="bar" style="margin-top:6px"><button onclick="startLive()">▶ Start live round (${n} player${n>1?'s':''})</button></div>`;
+    wrap.innerHTML=`<p class="hint">Who's playing? Names and handicaps here (Robin pairs rotate inside each foursome: players 1–4, 5–8…; change pairings in section 4 if needed). Then enter each hole as you play — tap a player, set score, putts, tee shot and green, Enter. The money updates after every hole.</p>
+      ${playerEditorHtml()}
+      <div class="bar" style="margin-top:10px"><button onclick="startLive()">▶ Start round (${n} player${n>1?'s':''})</button></div>`;
     return;
   }
   const hi=state.live.hole;const h=state.holes[hi];const par=h.par;const nH=state.holes.length;
@@ -1060,6 +1094,8 @@ function renderLive(){
     <button class="nav ghost" onclick="liveGo(${hi+1})" ${hi>=nH-1?'disabled':''} aria-label="Next hole">›</button>
   </div>`;
   if(pairLine)html+=`<div class="pairs-line">${pairLine}</div>`;
+  html+=`<div style="text-align:right;margin-top:4px"><button class="ghost small" onclick="toggleLivePlayers()">${livePlayersOpen?'Done':'✎ Players'}</button></div>`;
+  if(livePlayersOpen)html+=`<div class="seg" style="margin-top:4px">${playerEditorHtml()}</div>`;
   html+='<div class="plist">';
   state.players.forEach(p=>{
     const s=state.scores[p.id][hi];const run=playerRunning(p.id);const pi=pairOf[p.id];
@@ -1951,8 +1987,8 @@ document.addEventListener('paste',e=>{
   if(files.length)importImages(files);});
 
 state=freshState();
-if(restoreLive()){init();alertBar('Live round resumed — hole '+(state.live.hole+1));}
-else init();
+if(restoreLive()){init();showTab('live');alertBar('Live round resumed — hole '+(state.live.hole+1));}
+else{init();let t='live';try{t=localStorage.getItem('gbTab')||'live';}catch(e){}showTab(t);}
 renderSaved();
 ['roundName'].forEach(id=>{document.getElementById(id).addEventListener('input',()=>{if(isLive())saveLive();});});
 </script>

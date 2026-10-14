@@ -21,22 +21,37 @@ let fails=0;const ok=(c,m)=>{console.log((c?'PASS ':'FAIL ')+m);if(!c)fails++;};
   ok(await pg.$('#liveWrap button'),'start button rendered');
   await pg.click('#liveWrap button');
   ok(await pg.evaluate(()=>state.live&&state.live.hole===0),'live started at hole 1');
-  ok((await pg.textContent('.live-title b'))==='Hole 1','title shows Hole 1');
-  // tap strokes value for Rod -> par
-  const lp=await pg.$$('.lp');
-  ok(lp.length===4,'4 player rows');
-  await lp[0].$eval('.stp .val',el=>el.click());
-  ok(await pg.evaluate(()=>state.scores.p1[0].strokes===state.holes[0].par),'tap sets par');
-  // + twice on Rod strokes
-  await pg.$$eval('.lp',els=>{els[0].querySelectorAll('.stp')[0].querySelectorAll('button')[1].click();});
-  ok(await pg.evaluate(()=>state.scores.p1[0].strokes===state.holes[0].par+1),'+ increments');
-  // putts tap on Jon with no strokes: putts set to 2
-  await pg.$$eval('.lp',els=>{els[1].querySelectorAll('.stp')[1].querySelector('.val').click();});
-  ok(await pg.evaluate(()=>state.scores.p2[0].putts===2),'putts tap -> 2');
-  // toggles
-  await pg.$$eval('.lp',els=>{const t=els[0].querySelectorAll('.tog');t[0].click();t[1].click();t[2].click();});
-  ok(await pg.evaluate(()=>{const s=state.scores.p1[0];return s.dots===1&&s.fir===true&&s.gir===true;}),'dots/FW/GR toggles');
-  ok((await pg.textContent('#liveWrap')).includes('Still to enter: Jon, Max, Leo'),'missing players listed');
+  ok((await pg.textContent('.live-title b')).replace(/\s/g,'')==='1st','title shows 1st');
+  // Grint-style flow: player rows + Add Score sheet
+  ok((await pg.$$('.prow')).length===4,'4 player rows');
+  await pg.click('.prow:nth-child(1) .addscore');
+  ok(await pg.$('#sheet .sheet-panel'),'sheet opens');
+  ok((await pg.textContent('#sheet .sheet-name')).startsWith('Rod'),'sheet is for Rod');
+  ok((await pg.textContent('#sheet .vstep:nth-child(1) .vval')).trim()===String(await pg.evaluate(()=>state.holes[0].par)),'score defaults to par');
+  await pg.click('#sheet .vstep:nth-child(1) .vcol button:first-child'); // score +
+  await pg.click('#sheet .vstep:nth-child(2) .vcol button:last-child');  // putts -
+  await pg.click('#sheet .hit-big');                                      // fairway hit
+  await pg.click('#sheet .chip:not(.dots-chip)');                          // GIR
+  await pg.click('#sheet .dots-chip button:last-child');                   // dots +
+  await pg.click('#sheet .enter-btn');
+  ok(await pg.evaluate(()=>{const s=state.scores.p1[0];return s.strokes===state.holes[0].par+1&&s.putts===1&&s.fir===true&&s.gir===true&&s.dots===1;}),'Enter commits score/putts/FW/GR/dots');
+  ok((await pg.textContent('#sheet .sheet-name')).startsWith('Jon'),'Enter advances to next player (Jon)');
+  await pg.click('#sheet .tee-arrow.w');
+  await pg.click('#sheet .enter-btn');
+  ok(await pg.evaluate(()=>{const s=state.scores.p2[0];return s.strokes===state.holes[0].par&&s.putts===2&&s.fir===false&&s.firDir==='L';}),'missed-left arrow stores fir=false + direction');
+  await pg.click('#sheet .enter-btn');await pg.click('#sheet .enter-btn');
+  ok(!(await pg.$('#sheet .sheet-panel')),'sheet closes after last player');
+  ok(await pg.evaluate(()=>holeComplete(0)),'hole 1 complete');
+  ok((await pg.textContent('.prow:nth-child(1) .topar')).trim()==='+1','row shows +1 to par for Rod');
+  // par 3: sheet shows green button + CTP chip
+  await pg.evaluate(()=>liveGo(2));
+  await pg.click('.prow:nth-child(1) .addscore');
+  ok(await pg.$('#sheet .tee-wrap > .hit-big')&&!(await pg.$('#sheet .tee-pad')),'par 3 sheet: no tee pad, green button instead');
+  await pg.click('#sheet .tee-wrap > .hit-big');
+  await pg.click('#sheet .chip:last-child'); // CTP
+  await pg.click('#sheet .enter-btn');
+  ok(await pg.evaluate(()=>state.scores.p1[2].gir===true&&state.scores.p1[2].fir===null&&state.ctpWinners[2]==='p1'),'par 3: green + CTP winner saved');
+  await pg.evaluate(()=>closeSheet());
   // fill a whole 18-hole round deterministically through liveSet and compare with a direct engine run
   await pg.evaluate(()=>{
     const rng=mulberry32(7);
@@ -83,9 +98,12 @@ let fails=0;const ok=(c,m)=>{console.log((c?'PASS ':'FAIL ')+m);if(!c)fails++;};
   ok(sampleRes.includes('Who owes what')&&!sampleRes.includes('Live —'),'sample results render normally');
   await pg.screenshot({path:'live-shot.png',fullPage:false});
   // screenshot of the live panel for a visual check
-  await pg.evaluate(()=>{startLive();startLive();state.live.hole=2;liveSet('p1','strokes','tap');liveSet('p1','putts','tap');liveSet('p2','strokes','tap');});
+  await pg.evaluate(()=>{startLive();startLive();state.live.hole=0;liveSet('p1','strokes','tap');liveSet('p1','putts','tap');liveSet('p1','fir');liveSet('p2','strokes','tap');});
   await pg.evaluate(()=>document.getElementById('liveCard').scrollIntoView());
-  await pg.screenshot({path:'live-shot.png',fullPage:false});
+  await pg.screenshot({path:'live-list.png',fullPage:false});
+  await pg.evaluate(()=>openSheet('p3'));
+  await pg.waitForTimeout(300);
+  await pg.screenshot({path:'live-sheet.png',fullPage:false});
   await br.close();srv.close();
   console.log(fails?`\n${fails} FAILED`:'\nALL PASSED');process.exit(fails?1:0);
 })();

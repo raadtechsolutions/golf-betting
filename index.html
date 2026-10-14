@@ -107,6 +107,71 @@
   .holedots span { width:16px; height:16px; border-radius:4px; background:var(--line); font-size:9px; line-height:16px; text-align:center; color:var(--ink-soft); cursor:pointer; }
   .holedots span.done { background:var(--green-600); color:#fff; }
   .holedots span.cur { outline:2px solid var(--green-900); outline-offset:1px; }
+  /* ---- live: Grint-style player list + score sheet ---- */
+  .live-title b sup { font-size:12px; margin-left:1px; }
+  .pairs-line { display:flex; justify-content:center; gap:8px; flex-wrap:wrap; margin:8px 0 2px; font-size:12.5px; color:var(--ink-soft); }
+  .pairtag i { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:5px; vertical-align:middle; }
+  .plist { margin-top:8px; border-top:1px solid var(--line); }
+  .prow { display:flex; align-items:center; gap:12px; padding:10px 2px; border-bottom:1px solid var(--line); cursor:pointer; }
+  .prow.done { background:var(--green-50); }
+  .avatar { width:44px; height:44px; border-radius:50%; background:var(--green-800); color:#fff; font-weight:700; display:flex; align-items:center; justify-content:center; font-size:15px; flex:none; }
+  .pinfo { flex:1; min-width:0; }
+  .pname { font-weight:700; font-size:16px; }
+  .pname .hcp, .sheet-name .hcp { color:var(--ink-soft); font-weight:400; font-size:13px; }
+  .pdot { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:6px; vertical-align:middle; }
+  .prun { margin-top:2px; font-size:14px; display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
+  .prun .topar { background:var(--green-700); color:#fff; border-radius:999px; padding:1px 9px; font-weight:700; font-size:13px; }
+  .prun .gross { color:var(--ink-soft); }
+  .prun .psum { color:var(--ink-soft); font-size:12.5px; }
+  .prun .psum b { color:var(--ink); font-size:14px; }
+  .prun .warn { color:var(--amber); font-weight:700; }
+  .addscore { background:#fff; color:var(--green-700); border:1px solid var(--line); border-radius:12px; width:84px; min-height:56px; font-size:15px; line-height:1.15; flex:none; box-shadow:0 1px 2px rgba(0,0,0,.05); }
+  .addscore:hover { background:var(--green-50); }
+  .prow.done .addscore { font-size:13.5px; min-height:44px; }
+  body.sheet-open { overflow:hidden; }
+  #sheet { position:fixed; inset:0; z-index:20; }
+  .sheet-back { position:absolute; inset:0; background:rgba(10,20,14,.55); }
+  .sheet-panel { position:absolute; left:0; right:0; bottom:0; background:#fff; border-radius:18px 18px 0 0; padding:8px 16px calc(16px + env(safe-area-inset-bottom)); max-height:92vh; overflow-y:auto; box-shadow:0 -8px 30px rgba(0,0,0,.25); animation:sheetUp .18s ease-out; }
+  @keyframes sheetUp { from { transform:translateY(40px); opacity:.6; } to { transform:none; opacity:1; } }
+  .sheet-grip { width:44px; height:5px; border-radius:3px; background:#d9e0db; margin:2px auto 10px; }
+  .sheet-head { display:flex; align-items:center; gap:12px; padding-bottom:10px; border-bottom:2px solid var(--green-100); }
+  .sheet-head .avatar { width:48px; height:48px; }
+  .sheet-who { flex:1; min-width:0; }
+  .sheet-name { font-weight:700; font-size:18px; }
+  .sheet-run b { font-size:22px; color:var(--green-900); }
+  .sheet-run span { color:var(--ink-soft); font-size:16px; }
+  .sheet-run small { color:var(--ink-soft); }
+  .enter-btn { background:#3b6fb6; color:#fff; font-size:19px; font-weight:600; padding:0 22px; height:64px; border-radius:12px; }
+  .enter-btn:hover { background:#2f5e9e; }
+  .sheet-body { display:flex; gap:12px; justify-content:space-between; align-items:flex-start; padding:14px 0 10px; }
+  .vstep-wrap { display:flex; gap:14px; }
+  .vlabel { text-align:center; font-size:15px; color:var(--ink); margin-bottom:8px; }
+  .vcol { background:#e4edf7; border-radius:999px; width:76px; padding:8px 0; display:flex; flex-direction:column; align-items:center; gap:4px; }
+  .vcol button { width:58px; height:58px; border-radius:50%; background:#fff; color:#1f3a5a; font-size:28px; font-weight:400; padding:0; line-height:1; box-shadow:0 1px 3px rgba(0,0,0,.12); }
+  .vcol button:hover { background:#fff; }
+  .vval { font-size:40px; font-weight:700; color:#1f3a5a; line-height:1.2; padding:10px 0; }
+  .vval.under { color:var(--green-700); } .vval.over { color:var(--red); }
+  .tee-wrap { flex:1; min-width:150px; }
+  .tee-pad { position:relative; width:170px; height:170px; margin:0 auto; border-radius:50%; background:#e4edf7; }
+  .tee-arrow { position:absolute; width:52px; height:44px; background:transparent; color:#1f3a5a; font-size:22px; padding:0; border-radius:12px; }
+  .tee-arrow.n { top:2px; left:59px; } .tee-arrow.s { bottom:2px; left:59px; }
+  .tee-arrow.w { left:2px; top:63px; } .tee-arrow.e { right:2px; top:63px; }
+  .tee-arrow:hover { background:transparent; }
+  .tee-arrow.on { background:var(--red); color:#fff; }
+  .hit-big { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:84px; height:84px; border-radius:50%; background:#fff; color:#1f3a5a; font-size:19px; font-weight:800; letter-spacing:.5px; padding:0; box-shadow:0 1px 4px rgba(0,0,0,.15); }
+  .tee-wrap > .hit-big { position:static; transform:none; display:block; margin:0 auto; width:120px; height:120px; }
+  .hit-big.on { background:#9bd236; color:#1f3a1f; }
+  .hit-big:hover { background:#fff; } .hit-big.on:hover { background:#9bd236; }
+  .sheet-row { display:flex; gap:10px; flex-wrap:wrap; justify-content:center; padding-top:10px; border-top:1px solid var(--line); }
+  .chip { display:inline-flex; align-items:center; gap:6px; height:46px; padding:0 14px; border-radius:999px; background:#e4edf7; color:#1f3a5a; font-weight:600; font-size:14px; border:none; }
+  .chip:hover { background:#e4edf7; }
+  .chip.on { background:var(--green-700); color:#fff; }
+  .chip.on:hover { background:var(--green-700); }
+  .chip .ico { font-size:16px; }
+  .dots-chip button { width:34px; height:34px; border-radius:50%; background:#fff; color:#1f3a5a; font-size:20px; padding:0; line-height:1; }
+  .dots-chip button:hover { background:#fff; }
+  .dots-chip b { min-width:16px; text-align:center; font-size:16px; }
+  @media (max-width:420px){ .vcol{width:68px;} .vcol button{width:52px;height:52px;} .vval{font-size:34px;} .tee-pad{width:150px;height:150px;} .tee-arrow.n,.tee-arrow.s{left:49px;} .tee-arrow.w,.tee-arrow.e{top:53px;} .hit-big{width:74px;height:74px;font-size:17px;} .enter-btn{height:56px;font-size:17px;padding:0 16px;} }
   @media (max-width:640px){ body{font-size:14px;} input.score-in{width:38px;} }
 </style>
 </head>
@@ -207,7 +272,7 @@
     </div>
   </section>
 
-  <p class="footer-note">All pools zero-sum: what winners collect equals what the group put in. Robin settles directly between players at the $/point rate on point differences. If screenshot import can't start (no internet or a blocked network), scores can always be entered by hand.<br><b>v16</b> — live round: enter each hole on the course (strokes, putts, dots, fairway, green, CTP) and see Robin/Medal/CTP money update after every hole; autosaves on the phone and resumes if the page reloads · <b>v15.1</b> — GIR% totals must be a valid ninth (11%, 22%…) or they're ignored; mismatch warnings quote the text actually read · <b>v15</b> — player rows must look like players (phantom rows from misread stat labels can't appear); misread stat labels (e.g. GIR%) located from their neighbours instead of dropping the stat · <b>v14</b> — self-verifying import: fairways &amp; greens checked against the card's printed totals, dots cross-checked between players, per-player ✓/⚠ summary · Robin warns loudly when a variable is skipped for missing data</p>
+  <p class="footer-note">All pools zero-sum: what winners collect equals what the group put in. Robin settles directly between players at the $/point rate on point differences. If screenshot import can't start (no internet or a blocked network), scores can always be entered by hand.<br><b>v16.1</b> — live round screen redesigned Grint-style: player list with Add Score, score sheet with big Score/Putts steppers, tee-shot pad (HIT or missed direction), green, dots and closest-to-pin; Enter moves to the next player · <b>v16</b> — live round: enter each hole on the course (strokes, putts, dots, fairway, green, CTP) and see Robin/Medal/CTP money update after every hole; autosaves on the phone and resumes if the page reloads · <b>v15.1</b> — GIR% totals must be a valid ninth (11%, 22%…) or they're ignored; mismatch warnings quote the text actually read · <b>v15</b> — player rows must look like players (phantom rows from misread stat labels can't appear); misread stat labels (e.g. GIR%) located from their neighbours instead of dropping the stat · <b>v14</b> — self-verifying import: fairways &amp; greens checked against the card's printed totals, dots cross-checked between players, per-player ✓/⚠ summary · Robin warns loudly when a variable is skipped for missing data</p>
 </main>
 
 <script>
@@ -840,12 +905,13 @@ function liveGo(hi){
   renderLive();saveLive();
   document.getElementById('liveCard').scrollIntoView({behavior:'smooth',block:'start'});
 }
-function liveSet(pid,key,v){ // strokes / putts / dots / fir / gir for the current hole
+// ---- per-hole mutations (used by the sheet and by tests) ----
+function liveSet(pid,key,v){ // strokes / putts / dots / fir / gir for the current hole (direct edits)
   const hi=state.live.hole;const s=state.scores[pid][hi];const par=state.holes[hi].par;
   if(key==='fir'||key==='gir'){s[key]=!s[key];}
   else if(key==='dots'){s.dots=((s.dots||0)+1)%4;}
   else if(key==='strokes'){
-    if(v==='tap')s.strokes=s.strokes==null?par:s.strokes; // tap the number = made par
+    if(v==='tap')s.strokes=s.strokes==null?par:s.strokes;
     else{const base=s.strokes==null?par:s.strokes;s.strokes=Math.max(1,base+v);}
   }else if(key==='putts'){
     if(v==='tap')s.putts=s.putts==null?2:s.putts;
@@ -873,61 +939,152 @@ function liveCtp(pid){
 function holeComplete(hi){ // every player has strokes (putts optional, but surfaced)
   return state.players.every(p=>state.scores[p.id][hi]&&state.scores[p.id][hi].strokes!=null);
 }
+function toParTxt(n){return n===0?'E':(n>0?'+'+n:String(n));}
+function playerRunning(pid){ // gross strokes and to-par over the holes this player has entered
+  let gross=0,par=0,n=0;
+  (state.scores[pid]||[]).forEach((s,hi)=>{if(s&&s.strokes!=null){gross+=s.strokes;par+=state.holes[hi].par;n++;}});
+  return{gross,toPar:gross-par,holes:n};
+}
+
+// ---- the score sheet (Grint-style bottom panel) ----
+let sheet=null; // {pid, draft:{strokes,putts,dots,fir,firDir,gir,ctp}}
+function openSheet(pid){
+  const hi=state.live.hole;const s=state.scores[pid][hi];const par=state.holes[hi].par;
+  sheet={pid,draft:{
+    strokes:s.strokes==null?par:s.strokes,
+    putts:s.putts==null?2:s.putts,
+    dots:s.dots||0,
+    fir:s.strokes==null?null:!!s.fir,  // null = tee shot not chosen yet (shows HIT unselected)
+    firDir:s.firDir||null,
+    gir:!!s.gir,
+    ctp:state.ctpWinners[hi]===pid,
+  }};
+  renderSheet();
+  document.body.classList.add('sheet-open');
+}
+function closeSheet(){sheet=null;document.body.classList.remove('sheet-open');renderSheet();}
+function sheetAdj(key,d){
+  if(!sheet)return;const v=sheet.draft;
+  if(key==='strokes')v.strokes=Math.max(1,v.strokes+d);
+  if(key==='putts')v.putts=Math.max(0,v.putts+d);
+  if(key==='dots')v.dots=Math.max(0,Math.min(4,v.dots+d));
+  renderSheet();
+}
+function sheetTee(dir){ // 'hit' = fairway; 'L','R','S','T' = missed left/right/short/long
+  if(!sheet)return;
+  sheet.draft.fir=dir==='hit';sheet.draft.firDir=dir==='hit'?null:dir;
+  renderSheet();
+}
+function sheetToggle(key){if(!sheet)return;sheet.draft[key]=!sheet.draft[key];renderSheet();}
+function sheetEnter(){
+  if(!sheet)return;
+  const hi=state.live.hole;const pid=sheet.pid;const v=sheet.draft;const par=state.holes[hi].par;
+  const s=state.scores[pid][hi];
+  s.strokes=v.strokes;s.putts=v.putts;s.dots=v.dots;
+  s.fir=par===3?null:!!v.fir;s.firDir=par===3?null:v.firDir;
+  s.gir=!!v.gir;
+  ['strokes','putts','dots'].forEach(k=>setFlag(pid,hi,k,false));
+  if(par===3){if(v.ctp)state.ctpWinners[hi]=pid;else if(state.ctpWinners[hi]===pid)delete state.ctpWinners[hi];}
+  // move on to the next player without a score on this hole; close when everyone is in
+  const next=state.players.find(p=>state.scores[p.id][hi].strokes==null);
+  sheet=null;
+  renderResults();renderScorecard();renderCtp();saveLive();
+  if(next)openSheet(next.id);else{document.body.classList.remove('sheet-open');renderSheet();}
+}
+function renderSheet(){
+  let el=document.getElementById('sheet');
+  if(!el){el=document.createElement('div');el.id='sheet';document.body.appendChild(el);}
+  if(!sheet||!state.live){el.innerHTML='';el.style.display='none';return;}
+  const hi=state.live.hole;const h=state.holes[hi];const par=h.par;const p=state.players.find(x=>x.id===sheet.pid);
+  const v=sheet.draft;const run=playerRunning(p.id);
+  const dir=v.firDir;const hit=v.fir===true;
+  const arrow=(d,sym,cls)=>`<button class="tee-arrow ${cls} ${dir===d?'on':''}" onclick="sheetTee('${d}')" aria-label="Missed ${d}">${sym}</button>`;
+  el.style.display='';
+  el.innerHTML=`<div class="sheet-back" onclick="closeSheet()"></div>
+  <div class="sheet-panel" role="dialog" aria-label="Score for ${esc(p.name)}">
+    <div class="sheet-grip"></div>
+    <div class="sheet-head">
+      <div class="avatar">${esc(initials(p.name))}</div>
+      <div class="sheet-who"><div class="sheet-name">${esc(p.name)} <span class="hcp">[${p.handicap||0}]</span></div>
+        <div class="sheet-run"><b>${toParTxt(run.toPar)}</b> <span>${run.gross}</span> <small>· hole ${h.number} · par ${par}</small></div></div>
+      <button class="enter-btn" onclick="sheetEnter()">Enter</button>
+    </div>
+    <div class="sheet-body">
+      <div class="vstep-wrap">
+        <div class="vstep"><div class="vlabel">Score</div><div class="vcol"><button onclick="sheetAdj('strokes',1)">+</button><div class="vval ${v.strokes-par<0?'under':(v.strokes-par>0?'over':'')}">${v.strokes}</div><button onclick="sheetAdj('strokes',-1)">−</button></div></div>
+        <div class="vstep"><div class="vlabel">Putts</div><div class="vcol"><button onclick="sheetAdj('putts',1)">+</button><div class="vval">${v.putts}</div><button onclick="sheetAdj('putts',-1)">−</button></div></div>
+      </div>
+      <div class="tee-wrap">
+        <div class="vlabel">${par===3?'Green':'Tee shot'}</div>
+        ${par===3
+          ?`<button class="hit-big ${v.gir?'on':''}" onclick="sheetToggle('gir')">${v.gir?'ON':'GREEN?'}</button><div class="hint" style="margin:6px 0 0;text-align:center">tap if the tee shot found the green</div>`
+          :`<div class="tee-pad">
+              ${arrow('T','︿','n')}
+              ${arrow('L','〈','w')}
+              <button class="hit-big ${hit?'on':''}" onclick="sheetTee('hit')">HIT</button>
+              ${arrow('R','〉','e')}
+              ${arrow('S','﹀','s')}
+            </div><div class="hint" style="margin:4px 0 0;text-align:center">HIT = fairway · arrows = missed</div>`}
+      </div>
+    </div>
+    <div class="sheet-row">
+      ${par===3?'':`<button class="chip ${v.gir?'on':''}" onclick="sheetToggle('gir')"><span class="ico">⛳</span>Green in reg${v.gir?' ✓':''}</button>`}
+      <div class="chip dots-chip"><span class="ico">•</span>Dots <button onclick="sheetAdj('dots',-1)">−</button><b>${v.dots}</b><button onclick="sheetAdj('dots',1)">+</button></div>
+      ${par===3&&getGames().ctp?`<button class="chip ${v.ctp?'on':''}" onclick="sheetToggle('ctp')"><span class="ico">🎯</span>Closest to pin${v.ctp?' ✓':''}</button>`:''}
+    </div>
+  </div>`;
+}
+function initials(name){return String(name).trim().split(/\s+/).map(w=>w[0]||'').join('').slice(0,2).toUpperCase()||'?';}
+
 function renderLive(){
   const wrap=document.getElementById('liveWrap');if(!wrap)return;
+  renderSheet();
   if(!state.live){
     const n=state.players.length;
-    wrap.innerHTML=`<p class="hint">No Grint screenshot needed during the round: set the players and handicaps in section 2 (and the pairings in section 4 if they're not the default rotation), then enter each hole here as you play. Strokes, putts, handicap dots, fairway and green per player — the money updates after every hole. You can still drop the Grint screenshot at the end to double-check.</p>
+    wrap.innerHTML=`<p class="hint">No Grint screenshot needed during the round: set the players and handicaps in section 2 (and the pairings in section 4 if they're not the default rotation), then enter each hole here as you play — tap a player, set score, putts, tee shot and green, Enter. The money updates after every hole. You can still drop the Grint screenshot at the end to double-check.</p>
       <div class="bar" style="margin-top:6px"><button onclick="startLive()">▶ Start live round (${n} player${n>1?'s':''})</button></div>`;
     return;
   }
   const hi=state.live.hole;const h=state.holes[hi];const par=h.par;const nH=state.holes.length;
   const G=getGames();
-  // which pairs play together on this hole (Robin)
   const seg=state.segments.find(sg=>sg.holes.includes(hi));
   const pairOf={};
   if(seg)seg.pairs.forEach((pair,pi)=>{pair.forEach(pid=>{pairOf[pid]=pi;});});
-  const pairLine=seg&&G.robin?seg.pairs.map(pair=>pair.map(pid=>esc(pname(pid))).join(' & ')).join(' <span class="vs">vs</span> '):'';
+  const pairColors=['#276b3d','#8a6d1a','#2b5f8a','#7a3d8a','#b3402f','#2f8049'];
+  const pairLine=seg&&G.robin?seg.pairs.map((pair,pi)=>`<span class="pairtag"><i style="background:${pairColors[pi%pairColors.length]}"></i>${pair.map(pid=>esc(pname(pid))).join(' & ')}</span>`).join('<span class="vs">vs</span>'):'';
   let html=`<div class="live-head">
     <button class="nav ghost" onclick="liveGo(${hi-1})" ${hi===0?'disabled':''} aria-label="Previous hole">‹</button>
-    <div class="live-title"><b>Hole ${h.number}</b>
+    <div class="live-title"><b>${h.number}<sup>${ordSuffix(h.number)}</sup></b>
       <div class="parsel">${[3,4,5].map(p=>`<button class="${p===par?'on':''}" onclick="livePar(${p})">Par ${p}</button>`).join('')}</div>
     </div>
     <button class="nav ghost" onclick="liveGo(${hi+1})" ${hi>=nH-1?'disabled':''} aria-label="Next hole">›</button>
   </div>`;
-  if(pairLine)html+=`<p class="hint" style="text-align:center;margin:6px 0 0">${pairLine}</p>`;
-  // per-player entry rows
-  const pairColors=['#276b3d','#8a6d1a','#2b5f8a','#7a3d8a','#b3402f','#2f8049'];
+  if(pairLine)html+=`<div class="pairs-line">${pairLine}</div>`;
+  html+='<div class="plist">';
   state.players.forEach(p=>{
-    const s=state.scores[p.id][hi];
-    const dotsUsed=sum(state.scores[p.id].map(x=>x.dots||0));
-    const pi=pairOf[p.id];
-    const tag=(pi!=null&&G.robin)?`<span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${pairColors[pi%pairColors.length]};margin-right:6px;vertical-align:middle" title="Partner group"></span>`:'';
-    html+=`<div class="lp ${s.strokes!=null?'done':''}">
-      <div class="lp-name"><span>${tag}${esc(p.name)} <small>hcp ${p.handicap||0} · dots used ${dotsUsed}/${p.handicap||0}</small></span>
-        ${s.strokes!=null?`<button class="ghost small" onclick="liveClear('${p.id}')" title="Clear this hole for ${esc(p.name)}">clear</button>`:''}</div>
-      <div class="lp-ctrls">
-        <span class="stp"><span class="lbl">S</span><button onclick="liveSet('${p.id}','strokes',-1)">−</button><span class="val ${s.strokes==null?'empty':''}" onclick="liveSet('${p.id}','strokes','tap')">${s.strokes==null?'par?':s.strokes}</span><button onclick="liveSet('${p.id}','strokes',1)">+</button></span>
-        <span class="stp"><span class="lbl">P</span><button onclick="liveSet('${p.id}','putts',-1)">−</button><span class="val ${s.putts==null?'empty':''}" onclick="liveSet('${p.id}','putts','tap')">${s.putts==null?'2?':s.putts}</span><button onclick="liveSet('${p.id}','putts',1)">+</button></span>
-      </div>
-      <div class="lp-ctrls">
-        <button class="tog ${s.dots?'on':''}" onclick="liveSet('${p.id}','dots')" title="Handicap strokes on this hole (tap to cycle 0-3)">• ${s.dots||0} dot${s.dots===1?'':'s'}</button>
-        ${par===3?'':`<button class="tog ${s.fir?'on':''}" onclick="liveSet('${p.id}','fir')">FW ${s.fir?'✓':''}</button>`}
-        <button class="tog ${s.gir?'on':''}" onclick="liveSet('${p.id}','gir')">GR ${s.gir?'✓':''}</button>
-      </div>
+    const s=state.scores[p.id][hi];const run=playerRunning(p.id);const pi=pairOf[p.id];
+    const dot=(pi!=null&&G.robin)?`<i class="pdot" style="background:${pairColors[pi%pairColors.length]}"></i>`:'';
+    const entered=s.strokes!=null;
+    let summary='';
+    if(entered){
+      const bits=[`<b>${s.strokes}</b>`,s.putts!=null?`${s.putts} putt${s.putts===1?'':'s'}`:'<span class="warn">putts?</span>'];
+      if(par!==3)bits.push(s.fir?'FW ✓':'FW ✗');
+      bits.push(s.gir?'GR ✓':'GR ✗');
+      if(s.dots)bits.push(`•${s.dots}`);
+      if(state.ctpWinners[hi]===p.id)bits.push('🎯');
+      summary=bits.join(' · ');
+    }
+    html+=`<div class="prow ${entered?'done':''}" onclick="openSheet('${p.id}')">
+      <div class="avatar">${esc(initials(p.name))}</div>
+      <div class="pinfo"><div class="pname">${dot}${esc(p.name)} <span class="hcp">[${p.handicap||0}]</span></div>
+        <div class="prun"><span class="topar">${toParTxt(run.toPar)}</span> <span class="gross">(${run.gross})</span>${summary?`<span class="psum">${summary}</span>`:''}</div></div>
+      <button class="addscore" onclick="event.stopPropagation();openSheet('${p.id}')">${entered?'Edit':'Add<br>Score'}</button>
     </div>`;
   });
-  if(par===3&&G.ctp){
-    html+=`<div class="lp"><div class="lp-name">🎯 Closest to the pin <small>tap the winner · tap again to clear</small></div><div class="lp-ctrls">`
-      +state.players.map(p=>`<button class="tog ${state.ctpWinners[hi]===p.id?'on':''}" onclick="liveCtp('${p.id}')">${esc(p.name)}</button>`).join('')+'</div></div>';
-  }
-  // missing-data hint + navigation
+  html+='</div>';
   const missingS=state.players.filter(p=>state.scores[p.id][hi].strokes==null).map(p=>p.name);
-  const missingP=state.players.filter(p=>state.scores[p.id][hi].strokes!=null&&state.scores[p.id][hi].putts==null).map(p=>p.name);
-  if(missingS.length)html+=`<p class="hint" style="margin:8px 0 0">Still to enter: ${missingS.map(esc).join(', ')}</p>`;
-  else if(missingP.length&&getRobinVars().putts)html+=`<p class="hint" style="margin:8px 0 0"><span class="pill warn">putts missing for ${missingP.map(esc).join(', ')} — the putts point won't count on this hole</span></p>`;
   html+=`<div class="holedots">${state.holes.map((x,i)=>`<span class="${holeComplete(i)?'done':''} ${i===hi?'cur':''}" onclick="liveGo(${i})" title="Hole ${x.number}">${x.number}</span>`).join('')}</div>`;
-  html+=`<div class="bar">${hi<nH-1?`<button onclick="liveGo(${hi+1})">Next hole ›</button>`:`<button onclick="endLive()">✓ Finish round</button>`}<button class="ghost" onclick="endLive()">${hi<nH-1?'End round early':'Finish'}</button></div>`;
+  html+=`<div class="bar">${hi<nH-1?`<button onclick="liveGo(${hi+1})" ${missingS.length?'class="ghost"':''}>Next hole ›</button>`:`<button onclick="endLive()">✓ Finish round</button>`}<button class="ghost small" onclick="endLive()">${hi<nH-1?'End round early':'Finish'}</button></div>`;
   // standings through the last hole played
   const played=playedHoleCount();
   html+='<div class="live-stand">';
@@ -961,6 +1118,7 @@ function renderLive(){
   html+='</div>';
   wrap.innerHTML=html;
 }
+function ordSuffix(n){const v=n%100;if(v>=11&&v<=13)return 'th';return['th','st','nd','rd'][n%10]||'th';}
 
 function refresh(parts){
   ensureScores();ensureSegments();

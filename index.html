@@ -285,7 +285,7 @@
     </div>
   </section>
 
-  <p class="footer-note">All pools zero-sum: what winners collect equals what the group put in. Robin settles directly between players at the $/point rate on point differences. If screenshot import can't start (no internet or a blocked network), scores can always be entered by hand.<br><b>v16.2</b> — two tabs at the top (Enter as you play / Import from Grint); player names and handicaps editable right in the live tab, before and during the round · <b>v16.1</b> — live round screen redesigned Grint-style: player list with Add Score, score sheet with big Score/Putts steppers, tee-shot pad (HIT or missed direction), green, dots and closest-to-pin; Enter moves to the next player · <b>v16</b> — live round: enter each hole on the course (strokes, putts, dots, fairway, green, CTP) and see Robin/Medal/CTP money update after every hole; autosaves on the phone and resumes if the page reloads · <b>v15.1</b> — GIR% totals must be a valid ninth (11%, 22%…) or they're ignored; mismatch warnings quote the text actually read · <b>v15</b> — player rows must look like players (phantom rows from misread stat labels can't appear); misread stat labels (e.g. GIR%) located from their neighbours instead of dropping the stat · <b>v14</b> — self-verifying import: fairways &amp; greens checked against the card's printed totals, dots cross-checked between players, per-player ✓/⚠ summary · Robin warns loudly when a variable is skipped for missing data</p>
+  <p class="footer-note">All pools zero-sum: what winners collect equals what the group put in. Robin settles directly between players at the $/point rate on point differences. If screenshot import can't start (no internet or a blocked network), scores can always be entered by hand.<br><b>v16.3</b> — player name/handicap fields no longer need a second tap after editing another one · <b>v16.2</b> — two tabs at the top (Enter as you play / Import from Grint); player names and handicaps editable right in the live tab, before and during the round · <b>v16.1</b> — live round screen redesigned Grint-style: player list with Add Score, score sheet with big Score/Putts steppers, tee-shot pad (HIT or missed direction), green, dots and closest-to-pin; Enter moves to the next player · <b>v16</b> — live round: enter each hole on the course (strokes, putts, dots, fairway, green, CTP) and see Robin/Medal/CTP money update after every hole; autosaves on the phone and resumes if the page reloads · <b>v15.1</b> — GIR% totals must be a valid ninth (11%, 22%…) or they're ignored; mismatch warnings quote the text actually read · <b>v15</b> — player rows must look like players (phantom rows from misread stat labels can't appear); misread stat labels (e.g. GIR%) located from their neighbours instead of dropping the stat · <b>v14</b> — self-verifying import: fairways &amp; greens checked against the card's printed totals, dots cross-checked between players, per-player ✓/⚠ summary · Robin warns loudly when a variable is skipped for missing data</p>
 </main>
 
 <script>
@@ -556,13 +556,26 @@ function setFlag(pid,hi,field,on){
 }
 
 /* ===================== RENDER ===================== */
+// Player editors never rebuild their inputs while the player set is unchanged: a rebuild on
+// every name/handicap change destroyed the field the user was tapping next (needed two taps).
+function syncPlayerInputs(container){
+  state.players.forEach(p=>{
+    const n=container.querySelector(`input[data-name="${p.id}"]`);
+    if(n&&n.value!==p.name&&document.activeElement!==n)n.value=p.name;
+    const h=container.querySelector(`input[data-hcp="${p.id}"]`);
+    if(h&&document.activeElement!==h){if(String(h.value)!==String(p.handicap))h.value=p.handicap;h.classList.toggle('flagged',!!p.hcpMissing);}
+  });
+}
 function renderPlayers(){
   const g=document.getElementById('playerGrid');
+  const ids=state.players.map(p=>p.id).join(',');
+  if(g.dataset.ids===ids){syncPlayerInputs(g);return;}
+  g.dataset.ids=ids;
   let html='<div class="head">#</div><div class="head">Name</div><div class="head">Handicap</div><div class="head"></div>';
   state.players.forEach((p,i)=>{
     html+=`<div>${i+1}</div>
-      <div><input type="text" value="${esc(p.name)}" onchange="setName('${p.id}',this.value)"></div>
-      <div><input type="number" value="${p.handicap}" step="1" class="${p.hcpMissing?'flagged':''}" onchange="setHcp('${p.id}',this.value)"></div>
+      <div><input type="text" data-name="${p.id}" value="${esc(p.name)}" onchange="setName('${p.id}',this.value)"></div>
+      <div><input type="number" data-hcp="${p.id}" value="${p.handicap}" step="1" class="${p.hcpMissing?'flagged':''}" onchange="setHcp('${p.id}',this.value)"></div>
       <div>${state.players.length>2?`<button class="del" title="Remove" onclick="removePlayer('${p.id}')">✕</button>`:''}</div>`;
   });
   g.innerHTML=html;
@@ -849,12 +862,27 @@ function toggleLivePlayers(){livePlayersOpen=!livePlayersOpen;renderLive();}
 function playerEditorHtml(){ // same players as section 2 — edit names / handicaps here without leaving the live tab
   let h='<div class="ped"><label style="margin:0">Name</label><label style="margin:0">Handicap</label><span></span>';
   state.players.forEach(p=>{
-    h+=`<input type="text" value="${esc(p.name)}" placeholder="Name" onchange="setName('${p.id}',this.value)">
-        <input type="number" value="${p.handicap}" step="1" inputmode="numeric" onchange="setHcp('${p.id}',this.value)">
+    h+=`<input type="text" data-name="${p.id}" value="${esc(p.name)}" placeholder="Name" autocomplete="off" onchange="setName('${p.id}',this.value)">
+        <input type="number" data-hcp="${p.id}" value="${p.handicap}" step="1" inputmode="numeric" onchange="setHcp('${p.id}',this.value)">
         ${state.players.length>2?`<button class="del" title="Remove" onclick="removePlayer('${p.id}')">✕</button>`:'<span></span>'}`;
   });
   h+='</div><div class="bar" style="margin-top:8px"><button class="ghost small" onclick="addPlayer()">+ Add player</button></div>';
   return h;
+}
+function renderLiveEditor(show){ // #livePed persists across renderLive calls; only rebuilt when players are added/removed
+  let c=document.getElementById('livePed');
+  if(!c)return;
+  c.style.display=show?'':'none';
+  const ids=state.players.map(p=>p.id).join(',');
+  if(c.dataset.ids===ids){syncPlayerInputs(c);return;}
+  c.dataset.ids=ids;c.innerHTML=playerEditorHtml();
+}
+function liveShell(){ // liveWrap = top | editor | rest; the editor node is created once and kept
+  const wrap=document.getElementById('liveWrap');
+  if(!document.getElementById('livePed')){
+    wrap.innerHTML='<div id="liveTop"></div><div id="livePed" class="seg" style="margin-top:4px"></div><div id="liveRest"></div>';
+  }
+  return[document.getElementById('liveTop'),document.getElementById('liveRest')];
 }
 function isLive(){return !!(state&&state.live);}
 function lastPlayedHole(){ // highest hole index with any strokes entered, -1 if none
@@ -1072,11 +1100,12 @@ function initials(name){return String(name).trim().split(/\s+/).map(w=>w[0]||'')
 function renderLive(){
   const wrap=document.getElementById('liveWrap');if(!wrap)return;
   renderSheet();
+  const[top,rest]=liveShell();
   if(!state.live){
     const n=state.players.length;
-    wrap.innerHTML=`<p class="hint">Who's playing? Names and handicaps here (Robin pairs rotate inside each foursome: players 1–4, 5–8…; change pairings in section 4 if needed). Then enter each hole as you play — tap a player, set score, putts, tee shot and green, Enter. The money updates after every hole.</p>
-      ${playerEditorHtml()}
-      <div class="bar" style="margin-top:10px"><button onclick="startLive()">▶ Start round (${n} player${n>1?'s':''})</button></div>`;
+    top.innerHTML=`<p class="hint">Who's playing? Names and handicaps here (Robin pairs rotate inside each foursome: players 1–4, 5–8…; change pairings in section 4 if needed). Then enter each hole as you play — tap a player, set score, putts, tee shot and green, Enter. The money updates after every hole.</p>`;
+    renderLiveEditor(true);
+    rest.innerHTML=`<div class="bar" style="margin-top:10px"><button onclick="startLive()">▶ Start round (${n} player${n>1?'s':''})</button></div>`;
     return;
   }
   const hi=state.live.hole;const h=state.holes[hi];const par=h.par;const nH=state.holes.length;
@@ -1095,7 +1124,8 @@ function renderLive(){
   </div>`;
   if(pairLine)html+=`<div class="pairs-line">${pairLine}</div>`;
   html+=`<div style="text-align:right;margin-top:4px"><button class="ghost small" onclick="toggleLivePlayers()">${livePlayersOpen?'Done':'✎ Players'}</button></div>`;
-  if(livePlayersOpen)html+=`<div class="seg" style="margin-top:4px">${playerEditorHtml()}</div>`;
+  top.innerHTML=html;html='';
+  renderLiveEditor(livePlayersOpen);
   html+='<div class="plist">';
   state.players.forEach(p=>{
     const s=state.scores[p.id][hi];const run=playerRunning(p.id);const pi=pairOf[p.id];
@@ -1152,7 +1182,7 @@ function renderLive(){
     html+=`<p class="hint" style="margin:6px 0 0">Medal and CTP money assume the round ended now; Robin is the points so far at $${getBets().robinPerPoint}/pt. Full breakdown and settle-up in section 6.</p>`;
   }
   html+='</div>';
-  wrap.innerHTML=html;
+  rest.innerHTML=html;
 }
 function ordSuffix(n){const v=n%100;if(v>=11&&v<=13)return 'th';return['th','st','nd','rd'][n%10]||'th';}
 

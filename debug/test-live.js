@@ -28,6 +28,14 @@ let fails=0;const ok=(c,m)=>{console.log((c?'PASS ':'FAIL ')+m);if(!c)fails++;};
   await pg.fill('#liveWrap .ped input[type=text] >> nth=0','Rodrigo');
   await pg.press('#liveWrap .ped input[type=text] >> nth=0','Tab');
   ok(await pg.evaluate(()=>state.players[0].name==='Rodrigo'&&document.querySelector('#playerGrid input[type=text]').value==='Rodrigo'),'rename in live tab updates state + section 2');
+  // single tap moves focus to another field even though the previous one fires onchange
+  await pg.fill('#liveWrap .ped input[type=text] >> nth=0','Rodri');
+  await pg.click('#liveWrap .ped input[type=text] >> nth=1');
+  ok(await pg.evaluate(()=>state.players[0].name==='Rodri'&&document.activeElement===document.querySelectorAll('#liveWrap .ped input[type=text]')[1]),'one tap focuses the next name field after an edit');
+  await pg.fill('#liveWrap .ped input[data-hcp] >> nth=0','12');
+  await pg.click('#playerGrid input[type=text] >> nth=1');
+  ok(await pg.evaluate(()=>state.players[0].handicap===12&&document.activeElement===document.querySelectorAll('#playerGrid input[type=text]')[1]&&document.querySelector('#playerGrid input[data-hcp]').value==='12'),'section 2 keeps focus too and mirrors the handicap');
+  await pg.evaluate(()=>{state.players[0].name='Rodrigo';init();});
   await pg.click('#liveWrap .bar button.ghost'); // + Add player
   ok(await pg.evaluate(()=>state.players.length===5),'add player from live tab');
   await pg.click('#liveWrap .ped .del >> nth=4');

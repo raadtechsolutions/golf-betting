@@ -147,6 +147,17 @@ let fails=0;const ok=(c,m)=>{console.log((c?'PASS ':'FAIL ')+m);if(!c)fails++;};
   ok(await pg.evaluate(()=>getComputedStyle(document.getElementById('importPed')).display!=='none'&&document.querySelectorAll('#importPed input[data-name]').length===4&&getComputedStyle(document.getElementById('cardCtp')).display!=='none'),'imported/sample round: player editor + CTP picker shown on the Import side');
   await pg.evaluate(()=>saveRound(false));
   ok((await pg.textContent('#tab-saved')).includes('(1)')&&(await pg.$$('#savedList .seg')).length===1,'saved round appears in the Saved tab with a count');
+  await pg.click('#tab-saved');
+  ok(await pg.evaluate(()=>['setup','cardPairings','cardCtp','cardResults','cardScorecard'].every(id=>getComputedStyle(document.getElementById(id)).display==='none')),'Saved tab hides the working sections');
+  await pg.click('#savedList button.small');
+  ok(await pg.evaluate(()=>{const l=document.getElementById('savedList').textContent;return l.includes('Who owes what')&&!!document.querySelector('#savedList table.sc')&&!document.querySelector('#savedList input')&&l.includes('All rounds');}),'opening a saved round shows read-only results + scorecard');
+  const savedTot=await pg.evaluate(()=>[...document.querySelectorAll('#savedList .totals-table tbody tr')].map(tr=>tr.lastElementChild.textContent).join(','));
+  await pg.click('text=‹ All rounds');
+  ok((await pg.$$('#savedList .seg')).length===1&&!(await pg.$('#savedList table.sc')),'back to the list');
+  await pg.click('#savedList button.small');await pg.click('text=Edit in Play tab');
+  ok(await pg.evaluate(()=>curTab==='live'&&loadedId!=null&&getComputedStyle(document.getElementById('cardResults')).display!=='none'),'Edit in Play tab loads the round into the working sections');
+  const workTot=await pg.evaluate(()=>[...document.querySelectorAll('#resultsWrap .totals-table tbody tr')].map(tr=>tr.lastElementChild.textContent).join(','));
+  ok(savedTot===workTot&&savedTot.length>0,'viewer totals match the working results: '+workTot);
   await pg.screenshot({path:'live-shot.png',fullPage:false});
   // screenshot of the live panel for a visual check
   await pg.evaluate(()=>{startLive();startLive();state.live.hole=0;liveSet('p1','strokes','tap');liveSet('p1','putts','tap');liveSet('p1','fir');liveSet('p2','strokes','tap');});

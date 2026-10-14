@@ -30,14 +30,21 @@ let fails=0;const ok=(c,m)=>{console.log((c?'PASS ':'FAIL ')+m);if(!c)fails++;};
   ok((await pg.$$('#liveWrap .ped input[type=text]')).length===4,'player editor shows 4 name inputs');
   await pg.fill('#liveWrap .ped input[type=text] >> nth=0','Rodrigo');
   await pg.press('#liveWrap .ped input[type=text] >> nth=0','Tab');
-  ok(await pg.evaluate(()=>state.players[0].name==='Rodrigo'&&document.querySelector('#playerGrid input[type=text]').value==='Rodrigo'),'rename in live tab updates state + section 2');
+  ok(await pg.evaluate(()=>state.players[0].name==='Rodrigo'),'rename in live tab updates state');
   // single tap moves focus to another field even though the previous one fires onchange
   await pg.fill('#liveWrap .ped input[type=text] >> nth=0','Rodri');
   await pg.click('#liveWrap .ped input[type=text] >> nth=1');
   ok(await pg.evaluate(()=>state.players[0].name==='Rodri'&&document.activeElement===document.querySelectorAll('#liveWrap .ped input[type=text]')[1]),'one tap focuses the next name field after an edit');
   await pg.fill('#liveWrap .ped input[data-hcp] >> nth=0','12');
-  await pg.click('#playerGrid input[type=text] >> nth=1');
-  ok(await pg.evaluate(()=>state.players[0].handicap===12&&document.activeElement===document.querySelectorAll('#playerGrid input[type=text]')[1]&&document.querySelector('#playerGrid input[data-hcp]').value==='12'),'section 2 keeps focus too and mirrors the handicap');
+  await pg.click('#liveWrap .ped input[data-hcp] >> nth=1');
+  ok(await pg.evaluate(()=>state.players[0].handicap===12&&document.activeElement===document.querySelectorAll('#liveWrap .ped input[data-hcp]')[1]),'handicap field: one tap to the next one');
+  ok(await pg.evaluate(()=>!document.getElementById('playerGrid')&&getComputedStyle(document.getElementById('importPed')).display==='none'),'only one player list on the Play tab (import copy hidden until a card is read)');
+  // games drive the setup fields
+  await pg.uncheck('#g-medal');await pg.uncheck('#g-ctp');
+  ok(await pg.evaluate(()=>getComputedStyle(document.getElementById('poolBlock')).display==='none'&&getComputedStyle(document.getElementById('robinBlock')).display!=='none'&&getComputedStyle(document.getElementById('cardPairings')).display!=='none'),'Robin only: pool/prize split hidden, Robin settings + pairings shown');
+  await pg.check('#g-medal');await pg.uncheck('#g-robin');
+  ok(await pg.evaluate(()=>getComputedStyle(document.getElementById('poolBlock')).display!=='none'&&getComputedStyle(document.getElementById('betCtpWrap')).display==='none'&&getComputedStyle(document.getElementById('robinBlock')).display==='none'&&getComputedStyle(document.getElementById('cardPairings')).display==='none'&&document.getElementById('poolTitle').textContent==='Medal'),'Medal only: pool shown without CTP bet, Robin settings + pairings hidden');
+  await pg.check('#g-robin');await pg.check('#g-ctp');
   await pg.evaluate(()=>{state.players[0].name='Rodrigo';init();});
   await pg.click('#liveWrap .bar button.ghost'); // + Add player
   ok(await pg.evaluate(()=>state.players.length===5),'add player from live tab');
@@ -82,6 +89,17 @@ let fails=0;const ok=(c,m)=>{console.log((c?'PASS ':'FAIL ')+m);if(!c)fails++;};
   await pg.click('#sheet .enter-btn');
   ok(await pg.evaluate(()=>state.scores.p1[2].gir===true&&state.scores.p1[2].fir===null&&state.ctpWinners[2]==='p1'),'par 3: green + CTP winner saved');
   await pg.evaluate(()=>closeSheet());
+  ok(await pg.evaluate(()=>getComputedStyle(document.getElementById('cardCtp')).display==='none'),'CTP picker section hidden during a live round (winner comes from the sheet)');
+  await pg.uncheck('#g-ctp');
+  await pg.click('.prow:nth-child(2) .addscore');
+  ok(!(await pg.$('#sheet .chip:last-child:has-text("Closest")')),'no CTP chip on the sheet when CTP is not played');
+  await pg.evaluate(()=>closeSheet());await pg.check('#g-ctp');
+  // read-only scorecard summary
+  ok(await pg.evaluate(()=>{const t=document.querySelector('#scorecardWrap table.sc');return !!t&&t.textContent.includes('OUT')&&t.textContent.includes('IN')&&!t.querySelector('input');}),'scorecard is a read-only Grint-style summary');
+  await pg.click('#scToggle');
+  ok(await pg.evaluate(()=>!!document.querySelector('#scorecardWrap input.score-in')),'"Fix a cell" switches to the editable grid');
+  await pg.click('#scToggle');
+  ok(await pg.evaluate(()=>!document.querySelector('#scorecardWrap input')&&[...document.querySelectorAll('main > section.card')].map(s=>s.id).indexOf('cardScorecard')>[...document.querySelectorAll('main > section.card')].map(s=>s.id).indexOf('cardResults')),'back to summary; scorecard sits below Results');
   // fill a whole 18-hole round deterministically through liveSet and compare with a direct engine run
   await pg.evaluate(()=>{
     const rng=mulberry32(7);
@@ -126,6 +144,7 @@ let fails=0;const ok=(c,m)=>{console.log((c?'PASS ':'FAIL ')+m);if(!c)fails++;};
   ok(await pg.evaluate(()=>!state.live&&localStorage.getItem('gbLive')==null),'loadSample clears live');
   const sampleRes=await pg.textContent('#resultsWrap');
   ok(sampleRes.includes('Who owes what')&&!sampleRes.includes('Live —'),'sample results render normally');
+  ok(await pg.evaluate(()=>getComputedStyle(document.getElementById('importPed')).display!=='none'&&document.querySelectorAll('#importPed input[data-name]').length===4&&getComputedStyle(document.getElementById('cardCtp')).display!=='none'),'imported/sample round: player editor + CTP picker shown on the Import side');
   await pg.evaluate(()=>saveRound(false));
   ok((await pg.textContent('#tab-saved')).includes('(1)')&&(await pg.$$('#savedList .seg')).length===1,'saved round appears in the Saved tab with a count');
   await pg.screenshot({path:'live-shot.png',fullPage:false});

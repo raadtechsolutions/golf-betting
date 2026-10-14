@@ -84,6 +84,25 @@
   .ped { display:grid; grid-template-columns:1fr 78px 36px; gap:8px; align-items:center; margin-top:6px; }
   .ped input { height:42px; font-size:15px; }
   .ped .del { font-size:20px; }
+  /* ---- read-only scorecard summary ---- */
+  table.sc { font-size:12.5px; }
+  table.sc caption { caption-side:top; text-align:left; padding:0 0 6px; }
+  table.sc th, table.sc td { padding:3px 4px; min-width:26px; }
+  table.sc .sc-left { text-align:left; position:sticky; left:0; background:#fff; z-index:1; min-width:64px; max-width:110px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  table.sc th.sc-left { background:var(--green-100); }
+  table.sc .sc-tot { background:var(--sand); font-weight:700; }
+  table.sc tr.sc-par td { color:var(--ink-soft); background:#fafcfa; }
+  table.sc tr.sc-player td { border-top:2px solid var(--green-100); font-size:14px; }
+  table.sc .sc-name { font-weight:700; }
+  table.sc .sc-s { display:inline-block; min-width:18px; line-height:18px; border-radius:50%; }
+  table.sc .sc-birdie .sc-s { border:1.5px solid var(--green-700); color:var(--green-700); }
+  table.sc .sc-eagle .sc-s { border:3px double var(--green-700); color:var(--green-700); }
+  table.sc .sc-bogey .sc-s { border:1.5px solid var(--ink-soft); border-radius:3px; }
+  table.sc .sc-double .sc-s { border:3px double var(--red); border-radius:3px; color:var(--red); }
+  table.sc .sc-dots { display:block; font-size:8px; line-height:6px; color:var(--ink-soft); letter-spacing:1px; }
+  table.sc tr.sc-stat td { color:var(--ink-soft); font-size:12px; }
+  table.sc .sc-hit { color:var(--green-700); font-weight:700; } table.sc .sc-miss { color:#c9d1cb; } table.sc .sc-na { color:#c9d1cb; }
+  table.sc td.flagged, table.sc .flagged { background:var(--amber-bg); }
   /* ---- live round (hole-by-hole entry) ---- */
   .live-head { display:flex; align-items:center; justify-content:space-between; gap:8px; }
   .live-head .nav { width:52px; height:46px; font-size:22px; padding:0; border-radius:12px; }
@@ -210,6 +229,7 @@
     </div>
     <input type="file" id="fileInput" accept="image/*" multiple style="display:none">
     <div id="importStatus"></div>
+    <div id="importPed" class="seg" style="margin-top:10px;display:none"></div>
   </section>
 
   <section class="card tabpane" id="savedCard" data-tab="saved">
@@ -219,75 +239,79 @@
   </section>
 
   <section class="card" id="setup">
-    <h2>2 · Round setup</h2>
-    <div class="row">
-      <div style="flex:2 1 200px"><label>Round name</label><input type="text" id="roundName" value="" placeholder="Saturday game"></div>
-      <div><label>Medal bet / player ($)</label><input type="number" id="betMedal" value="10" min="0" step="1"></div>
-      <div><label>CTP bet / player ($)</label><input type="number" id="betCtp" value="10" min="0" step="1"></div>
-      <div><label>Robin $ / point</label><input type="number" id="betRobin" value="1" min="0" step="0.5"></div>
-    </div>
-    <h3>Games played</h3>
-    <p class="hint">Only checked games are counted in the payouts.</p>
+    <h2>Round setup</h2>
+    <h3 style="margin-top:4px">Games played</h3>
+    <p class="hint">Tick what the group is playing today — only those games are counted, and only their settings are shown.</p>
     <div class="togglerow">
       <label><input class="cb" type="checkbox" id="g-robin" checked onchange="onGamesChange()"> Robin</label>
       <label><input class="cb" type="checkbox" id="g-medal" checked onchange="onGamesChange()"> Medal</label>
       <label><input class="cb" type="checkbox" id="g-ctp" checked onchange="onGamesChange()"> Closest to the pin</label>
     </div>
-    <h3>Players &amp; handicaps</h3>
-    <p class="hint">Filled automatically by the import (handicap from Grint). Robin pairs rotate inside each foursome (players 1–4, 5–8, 9–12…).</p>
-    <div class="player-grid" id="playerGrid"></div>
-    <div class="bar">
-      <button class="ghost small" onclick="addPlayer()">+ Add player</button>
+    <div class="row" style="margin-top:8px">
+      <div style="flex:2 1 200px"><label>Round name</label><input type="text" id="roundName" value="" placeholder="Saturday game"></div>
+    </div>
+    <div id="robinBlock">
+      <h3>Robin</h3>
+      <div class="row">
+        <div style="flex:0 1 160px"><label>$ per point</label><input type="number" id="betRobin" value="1" min="0" step="0.5"></div>
+      </div>
+      <div id="robinVarsBlock">
+      <p class="hint" style="margin-top:8px">Point variables (compared pair against pair on every hole):</p>
+      <div class="togglerow">
+        <label><input class="cb" type="checkbox" id="rv-fir" checked onchange="renderResults()"> Fairways</label>
+        <label><input class="cb" type="checkbox" id="rv-gir" checked onchange="renderResults()"> Greens</label>
+        <label><input class="cb" type="checkbox" id="rv-low" checked onchange="renderResults()"> Low ball</label>
+        <label><input class="cb" type="checkbox" id="rv-comb" checked onchange="renderResults()"> Combined score</label>
+        <label><input class="cb" type="checkbox" id="rv-putts" checked onchange="renderResults()"> Putts</label>
+      </div>
+      </div>
+    </div>
+    <div id="poolBlock">
+      <h3 id="poolTitle">Medal &amp; Closest to the pin</h3>
+      <div class="row">
+        <div id="betMedalWrap"><label>Medal bet / player ($)</label><input type="number" id="betMedal" value="10" min="0" step="1"></div>
+        <div id="betCtpWrap"><label>CTP bet / player ($)</label><input type="number" id="betCtp" value="10" min="0" step="1"></div>
+      </div>
+      <p class="hint" style="margin-top:8px">Prize split of each pool:</p>
+      <div class="row">
+        <div><label>Places paid (≤8 players)</label><input type="text" id="splitSmall" value="60/40"></div>
+        <div><label>Places paid (9+ players)</label><input type="text" id="splitLarge" value="60/30/10"></div>
+      </div>
+    </div>
+    <div class="bar" style="margin-top:14px">
       <button class="ghost small" onclick="loadSample()">Load sample round</button>
       <button class="ghost small" onclick="resetAll()">Clear everything</button>
     </div>
-    <div id="robinVarsBlock">
-    <h3>Robin point variables</h3>
-    <p class="hint">Variables missing from the screenshots are switched off automatically.</p>
-    <div class="togglerow">
-      <label><input class="cb" type="checkbox" id="rv-fir" checked onchange="renderResults()"> Fairways</label>
-      <label><input class="cb" type="checkbox" id="rv-gir" checked onchange="renderResults()"> Greens</label>
-      <label><input class="cb" type="checkbox" id="rv-low" checked onchange="renderResults()"> Low ball</label>
-      <label><input class="cb" type="checkbox" id="rv-comb" checked onchange="renderResults()"> Combined score</label>
-      <label><input class="cb" type="checkbox" id="rv-putts" checked onchange="renderResults()"> Putts</label>
-    </div>
-    </div>
-    <h3>Prize split</h3>
-    <p class="hint">Applied to the Medal and CTP pools. Robin settles player-to-player at $/point.</p>
-    <div class="row">
-      <div><label>Places paid (≤8 players)</label><input type="text" id="splitSmall" value="60/40"></div>
-      <div><label>Places paid (9+ players)</label><input type="text" id="splitLarge" value="60/30/10"></div>
-    </div>
-  </section>
-
-  <section class="card">
-    <h2 style="display:flex;justify-content:space-between;align-items:center">3 · Scorecard <button class="ghost small" id="scToggle" onclick="toggleScorecard()">Hide</button></h2>
-    <p class="hint">The import fills this in and verifies it against the card's own totals — it stays tucked away unless something needs a look. Anything the reader wasn't sure about is <b style="background:var(--amber-bg);padding:0 4px;border-radius:4px">highlighted</b> for a quick check. <b>S</b>&nbsp;strokes · <b>•</b>&nbsp;handicap strokes on the hole (the dots — subtracted for Robin low ball &amp; sum) · <b>P</b>&nbsp;putts · <b>FW</b>&nbsp;fairway · <b>GR</b>&nbsp;green in regulation.</p>
-    <div class="scroll" id="scorecardWrap"></div>
   </section>
 
   <section class="card" id="cardPairings">
-    <h2>4 · Robin pairings</h2>
+    <h2>Robin pairings</h2>
     <p class="hint">Default rotation: 1&2 v 3&4 → 1&3 v 2&4 → 1&4 v 2&3 every six holes. Pick one couple and the other fills in by itself.</p>
     <div id="pairingsWrap"></div>
   </section>
 
   <section class="card" id="cardCtp">
-    <h2>5 · Closest to the pin</h2>
+    <h2>Closest to the pin</h2>
     <p class="hint">Pick the winner on each par 3 (leave blank if nobody hit the green).</p>
     <div id="ctpWrap"></div>
   </section>
 
-  <section class="card">
-    <h2>6 · Results</h2>
-    <div id="resultsWrap"><p class="hint">Import a round (or enter scores) and results appear here.</p></div>
+  <section class="card" id="cardResults">
+    <h2>Results</h2>
+    <div id="resultsWrap"><p class="hint">Enter a round (or import one) and results appear here.</p></div>
     <div class="bar" id="saveBar" style="display:none">
       <button onclick="saveRound(false)">💾 <span id="saveBtnLabel">Save this round</span></button>
       <button class="ghost small" id="saveAsNewBtn" style="display:none" onclick="saveRound(true)">Save as a new round</button>
     </div>
   </section>
 
-  <p class="footer-note">All pools zero-sum: what winners collect equals what the group put in. Robin settles directly between players at the $/point rate on point differences. If screenshot import can't start (no internet or a blocked network), scores can always be entered by hand.<br><b>v16.4</b> — saved rounds moved to a third tab · <b>v16.3</b> — player name/handicap fields no longer need a second tap after editing another one · <b>v16.2</b> — two tabs at the top (Enter as you play / Import from Grint); player names and handicaps editable right in the live tab, before and during the round · <b>v16.1</b> — live round screen redesigned Grint-style: player list with Add Score, score sheet with big Score/Putts steppers, tee-shot pad (HIT or missed direction), green, dots and closest-to-pin; Enter moves to the next player · <b>v16</b> — live round: enter each hole on the course (strokes, putts, dots, fairway, green, CTP) and see Robin/Medal/CTP money update after every hole; autosaves on the phone and resumes if the page reloads · <b>v15.1</b> — GIR% totals must be a valid ninth (11%, 22%…) or they're ignored; mismatch warnings quote the text actually read · <b>v15</b> — player rows must look like players (phantom rows from misread stat labels can't appear); misread stat labels (e.g. GIR%) located from their neighbours instead of dropping the stat · <b>v14</b> — self-verifying import: fairways &amp; greens checked against the card's printed totals, dots cross-checked between players, per-player ✓/⚠ summary · Robin warns loudly when a variable is skipped for missing data</p>
+  <section class="card" id="cardScorecard">
+    <h2 style="display:flex;justify-content:space-between;align-items:center">Scorecard <button class="ghost small" id="scToggle" onclick="toggleScorecard()">✎ Fix a cell</button></h2>
+    <p class="hint" id="scHint">Summary of everything entered or read from Grint. Handicap strokes show as dots next to the score; <b>P</b>&nbsp;putts · <b>FW</b>&nbsp;fairway · <b>GR</b>&nbsp;green in regulation. Cells the reader wasn't sure about are <b style="background:var(--amber-bg);padding:0 4px;border-radius:4px">highlighted</b>.</p>
+    <div class="scroll" id="scorecardWrap"></div>
+  </section>
+
+  <p class="footer-note">All pools zero-sum: what winners collect equals what the group put in. Robin settles directly between players at the $/point rate on point differences. If screenshot import can't start (no internet or a blocked network), scores can always be entered by hand.<br><b>v17</b> — one player list (in the Play tab; the Import tab shows the players read from the card), Round setup shows only the settings of the games ticked, read-only Grint-style scorecard summary at the bottom ("Fix a cell" for import corrections), CTP picked on the par-3 score sheet · <b>v16.4</b> — saved rounds moved to a third tab · <b>v16.3</b> — player name/handicap fields no longer need a second tap after editing another one · <b>v16.2</b> — two tabs at the top (Enter as you play / Import from Grint); player names and handicaps editable right in the live tab, before and during the round · <b>v16.1</b> — live round screen redesigned Grint-style: player list with Add Score, score sheet with big Score/Putts steppers, tee-shot pad (HIT or missed direction), green, dots and closest-to-pin; Enter moves to the next player · <b>v16</b> — live round: enter each hole on the course (strokes, putts, dots, fairway, green, CTP) and see Robin/Medal/CTP money update after every hole; autosaves on the phone and resumes if the page reloads · <b>v15.1</b> — GIR% totals must be a valid ninth (11%, 22%…) or they're ignored; mismatch warnings quote the text actually read · <b>v15</b> — player rows must look like players (phantom rows from misread stat labels can't appear); misread stat labels (e.g. GIR%) located from their neighbours instead of dropping the stat · <b>v14</b> — self-verifying import: fairways &amp; greens checked against the card's printed totals, dots cross-checked between players, per-player ✓/⚠ summary · Robin warns loudly when a variable is skipped for missing data</p>
 </main>
 
 <script>
@@ -532,14 +556,18 @@ function getGames(){
     ctp:document.getElementById('g-ctp').checked,
   };
 }
-function onGamesChange(){
+function onGamesChange(){ // only the settings of the games being played are shown
   const g=getGames();
-  document.getElementById('cardPairings').style.display=g.robin?'':'none';
-  document.getElementById('robinVarsBlock').style.display=g.robin?'':'none';
-  document.getElementById('cardCtp').style.display=g.ctp?'':'none';
-  document.getElementById('betMedal').disabled=!g.medal;
-  document.getElementById('betCtp').disabled=!g.ctp;
-  document.getElementById('betRobin').disabled=!g.robin;
+  const show=(id,on)=>{const el=document.getElementById(id);if(el)el.style.display=on?'':'none';};
+  show('robinBlock',g.robin);
+  show('cardPairings',g.robin);
+  show('poolBlock',g.medal||g.ctp);
+  show('betMedalWrap',g.medal);
+  show('betCtpWrap',g.ctp);
+  const pt=document.getElementById('poolTitle');
+  if(pt)pt.textContent=g.medal&&g.ctp?'Medal & Closest to the pin':(g.medal?'Medal':'Closest to the pin');
+  // CTP winners are picked on the par-3 score sheet during a live round; the picker section is for imported rounds
+  show('cardCtp',g.ctp&&!isLive()&&!(state&&state.liveDone));
   renderResults();
 }
 function getRobinVars(){
@@ -568,36 +596,65 @@ function syncPlayerInputs(container){
     if(h&&document.activeElement!==h){if(String(h.value)!==String(p.handicap))h.value=p.handicap;h.classList.toggle('flagged',!!p.hcpMissing);}
   });
 }
-function renderPlayers(){
-  const g=document.getElementById('playerGrid');
+function renderPlayers(){ // the Import tab's copy of the player editor (names/handicaps read from the card can be fixed here)
+  const c=document.getElementById('importPed');if(!c)return;
+  const anyScore=state.players.some(p=>(state.scores[p.id]||[]).some(x=>x&&x.strokes!=null));
+  const show=anyScore&&!isLive();
+  c.style.display=show?'':'none';
+  if(!show)return;
   const ids=state.players.map(p=>p.id).join(',');
-  if(g.dataset.ids===ids){syncPlayerInputs(g);return;}
-  g.dataset.ids=ids;
-  let html='<div class="head">#</div><div class="head">Name</div><div class="head">Handicap</div><div class="head"></div>';
-  state.players.forEach((p,i)=>{
-    html+=`<div>${i+1}</div>
-      <div><input type="text" data-name="${p.id}" value="${esc(p.name)}" onchange="setName('${p.id}',this.value)"></div>
-      <div><input type="number" data-hcp="${p.id}" value="${p.handicap}" step="1" class="${p.hcpMissing?'flagged':''}" onchange="setHcp('${p.id}',this.value)"></div>
-      <div>${state.players.length>2?`<button class="del" title="Remove" onclick="removePlayer('${p.id}')">✕</button>`:''}</div>`;
-  });
-  g.innerHTML=html;
+  if(c.dataset.ids===ids){syncPlayerInputs(c);return;}
+  c.dataset.ids=ids;
+  c.innerHTML='<p class="hint" style="margin:0 0 4px"><b>Players read from the card</b> — fix a name or a missing handicap here.</p>'+playerEditorHtml();
 }
-let scOpen=true;
-function toggleScorecard(){scOpen=!scOpen;renderScorecard();}
+let scOpen=true; // kept for saved-round compatibility (unused)
+let scEdit=false;
+function toggleScorecard(){scEdit=!scEdit;renderScorecard();}
+function scoreClass(strokes,par){const d=strokes-par;return d<=-2?'sc-eagle':(d===-1?'sc-birdie':(d===0?'':(d===1?'sc-bogey':'sc-double')));}
 function renderScorecard(){
   const wrap=document.getElementById('scorecardWrap');
   const btn=document.getElementById('scToggle');
   const flagCount=Object.values(state.flags||{}).reduce((a,f)=>a+Object.keys(f).length,0);
-  if(!scOpen){
-    if(btn)btn.textContent='Show';
-    const parts=state.players.map(p=>{
-      const played=(state.scores[p.id]||[]).filter(s=>s&&s.strokes!=null);
-      const g=sum(played.map(s=>s.strokes));
-      return `${esc(p.name)} ${played.length?g:'—'}`;});
-    wrap.innerHTML=`<p class="hint" style="margin:0">${parts.join(' · ')} ${flagCount?`<span class="pill warn">${flagCount} cell${flagCount>1?'s':''} to check — press Show</span>`:'<span class="pill">✓ totals verified</span>'}</p>`;
-    return;
+  const anyScore=state.players.some(p=>(state.scores[p.id]||[]).some(x=>x&&x.strokes!=null));
+  if(btn){btn.textContent=scEdit?'Done':'✎ Fix a cell';btn.style.display=anyScore?'':'none';}
+  if(!anyScore){wrap.innerHTML='<p class="hint" style="margin:0">The scorecard fills in as you enter holes (or after an import).</p>';return;}
+  if(scEdit){renderScorecardEditable(wrap);return;}
+  const nH=state.holes.length;const nine=nH>=18?9:nH;
+  const segs=nH>=18?[{label:'OUT',from:0,to:9},{label:'IN',from:9,to:18}]:[{label:'TOT',from:0,to:nH}];
+  const G=getGames();
+  let html=`<table class="sc">${flagCount?`<caption><span class="pill warn">${flagCount} cell${flagCount>1?'s':''} to check — tap "Fix a cell"</span></caption>`:''}<thead><tr><th class="sc-left">Hole</th>`;
+  segs.forEach((sg,k)=>{for(let i=sg.from;i<sg.to;i++)html+=`<th>${state.holes[i].number}</th>`;html+=`<th class="sc-tot">${sg.label}</th>`;});
+  if(segs.length>1)html+='<th class="sc-tot">TOT</th>';
+  html+='<th class="sc-tot">HCP</th><th class="sc-tot">NET</th></tr>';
+  html+='<tr class="sc-par"><td class="sc-left">Par</td>';
+  let parAll=0;segs.forEach(sg=>{let t=0;for(let i=sg.from;i<sg.to;i++){html+=`<td>${state.holes[i].par}</td>`;t+=state.holes[i].par;}parAll+=t;html+=`<td class="sc-tot">${t}</td>`;});
+  if(segs.length>1)html+=`<td class="sc-tot">${parAll}</td>`;
+  html+='<td></td><td></td></tr></thead><tbody>';
+  state.players.forEach(p=>{
+    const ss=state.scores[p.id];
+    const rowStart=`<tr class="sc-player"><td class="sc-left sc-name">${esc(p.name)}</td>`;
+    html+=rowStart;
+    let gross=0,played=0;
+    segs.forEach(sg=>{let t=0,n=0;for(let i=sg.from;i<sg.to;i++){const s=ss[i];
+      if(s&&s.strokes!=null){t+=s.strokes;n++;html+=`<td class="${scoreClass(s.strokes,state.holes[i].par)} ${isFlagged(p.id,i,'strokes')||isFlagged(p.id,i,'dots')?'flagged':''}"><span class="sc-s">${s.strokes}</span>${s.dots?`<span class="sc-dots">${'•'.repeat(Math.min(4,s.dots))}</span>`:''}</td>`;}
+      else html+='<td></td>';}
+      gross+=t;played+=n;html+=`<td class="sc-tot">${n?t:''}</td>`;});
+    if(segs.length>1)html+=`<td class="sc-tot">${played?gross:''}</td>`;
+    html+=`<td class="sc-tot">${p.handicap||0}</td><td class="sc-tot">${played?gross-(p.handicap||0):''}</td></tr>`;
+    // stat rows
+    const stat=(label,cell,total)=>{let h=`<tr class="sc-stat"><td class="sc-left">${label}</td>`;segs.forEach(sg=>{let acc=[];for(let i=sg.from;i<sg.to;i++){const s=ss[i];h+=`<td>${s&&s.strokes!=null?cell(s,i):''}</td>`;if(s&&s.strokes!=null)acc.push(s);}h+=`<td class="sc-tot">${total(acc,sg)}</td>`;});if(segs.length>1)h+='<td class="sc-tot"></td>';h+='<td></td><td></td></tr>';return h;};
+    html+=stat('P',(s,i)=>s.putts==null?'<span class="sc-na">–</span>':`<span class="${isFlagged(p.id,i,'putts')?'flagged':''}">${s.putts}</span>`,acc=>{const v=acc.filter(s=>s.putts!=null);return v.length?sum(v.map(s=>s.putts)):'';});
+    html+=stat('FW',(s,i)=>state.holes[i].par===3?'':(s.fir==null?'<span class="sc-na">–</span>':(s.fir?'<span class="sc-hit">◎</span>':'<span class="sc-miss">✕</span>')),acc=>{const v=acc.filter((s)=>s.fir!=null);const nP=acc.filter((s,k)=>true).length;const eligible=acc.filter(s=>s.fir!=null).length;return eligible?`${v.filter(s=>s.fir).length}/${eligible}`:'';});
+    html+=stat('GR',(s,i)=>s.gir==null?'<span class="sc-na">–</span>':(s.gir?'<span class="sc-hit">◎</span>':'<span class="sc-miss">✕</span>'),acc=>{const v=acc.filter(s=>s.gir!=null);return v.length?Math.round(100*v.filter(s=>s.gir).length/v.length)+'%':'';});
+  });
+  if(G.ctp){
+    const w=state.holes.map((h,i)=>h.par===3&&state.ctpWinners[i]?i:-1).filter(i=>i>=0);
+    if(w.length){html+=`<tr class="sc-stat"><td class="sc-left">🎯</td>`;segs.forEach(sg=>{for(let i=sg.from;i<sg.to;i++)html+=`<td>${state.ctpWinners[i]&&state.holes[i].par===3?esc(initials(pname(state.ctpWinners[i]))):''}</td>`;html+='<td class="sc-tot"></td>';});if(segs.length>1)html+='<td class="sc-tot"></td>';html+='<td></td><td></td></tr>';}
   }
-  if(btn)btn.textContent='Hide';
+  html+='</tbody></table>';
+  wrap.innerHTML=html;
+}
+function renderScorecardEditable(wrap){
   let html='<table><thead><tr><th rowspan="2">Hole</th><th rowspan="2">Par</th>';
   state.players.forEach(p=>{html+=`<th colspan="5">${esc(p.name)}</th>`;});
   html+='</tr><tr>';
@@ -668,7 +725,7 @@ function renderResults(){
   const round=buildRound();
   const r=computeAll(round);
   const G=getGames();
-  if(!G.robin&&!G.medal&&!G.ctp){wrap.innerHTML='<p class="hint">No games selected — check at least one game in section 2.</p>';return;}
+  if(!G.robin&&!G.medal&&!G.ctp){wrap.innerHTML='<p class="hint">No games selected — tick at least one game in Round setup.</p>';return;}
   const gTotal={};
   state.players.forEach(p=>{
     gTotal[p.id]=round2((G.robin?(r.robinPay.net[p.id]||0):0)+(G.medal?(r.medal.net[p.id]||0):0)+(G.ctp?(r.ctp.net[p.id]||0):0));
@@ -728,7 +785,7 @@ function renderResults(){
   if(G.ctp){
   html+=`<h3>🎯 Closest to the pin — pool $${r.ctp.pool}</h3>`;
   const winners=Object.entries(r.ctp.wins).filter(([,n])=>n>0);
-  if(!winners.length){html+='<p class="hint">No CTP winners selected yet (section 5).</p>';}
+  if(!winners.length){html+='<p class="hint">No closest-to-the-pin winners yet.</p>';}
   else{
     html+='<div>'+winners.sort((a,b)=>b[1]-a[1]).map(([id,n])=>`<span class="pill">${esc(pname(id))}: ${n} win${n>1?'s':''} ${r.ctp.payouts[id]?'→ $'+r.ctp.payouts[id]:''}</span>`).join('')+'</div>';
   }
@@ -796,7 +853,7 @@ function resetAll(){
   state=freshState();customPairs=false;
   document.getElementById('importStatus').innerHTML='';
   startNewRound();
-  init();
+  init();onGamesChange();
 }
 let resetArmed=false;
 function confirmReset(){
@@ -839,7 +896,7 @@ function loadSample(){
   par3s.forEach((hi,k)=>{if(rng()>0.25)state.ctpWinners[hi]=state.players[Math.floor(rng()*4)].id;});
   customPairs=false;
   startNewRound();
-  init();
+  init();onGamesChange();
   alertBar('Sample round loaded — scroll down to see the payouts.');
 }
 function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;var t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;}}
@@ -916,16 +973,16 @@ function startLive(){
   document.getElementById('importStatus').innerHTML='';
   if(!(document.getElementById('roundName').value||'').trim())document.getElementById('roundName').value=defaultRoundName();
   scOpen=false;
-  init();
+  init();onGamesChange();
   saveLive();
   document.getElementById('liveCard').scrollIntoView({behavior:'smooth'});
 }
 let liveArmed=false;
 function endLive(){
   if(!state.live)return;
-  delete state.live;
+  delete state.live;state.liveDone=true;
   clearLive();
-  init();
+  init();onGamesChange();
   alertBar('Round finished — results below. Save it to keep it.');
   document.getElementById('resultsWrap').scrollIntoView({behavior:'smooth'});
 }
@@ -1105,7 +1162,7 @@ function renderLive(){
   const[top,rest]=liveShell();
   if(!state.live){
     const n=state.players.length;
-    top.innerHTML=`<p class="hint">Who's playing? Names and handicaps here (Robin pairs rotate inside each foursome: players 1–4, 5–8…; change pairings in section 4 if needed). Then enter each hole as you play — tap a player, set score, putts, tee shot and green, Enter. The money updates after every hole.</p>`;
+    top.innerHTML=`<p class="hint">Who's playing? Names and handicaps here (Robin pairs rotate inside each foursome: players 1–4, 5–8…; the pairings can be changed below). Pick the games in Round setup, then enter each hole as you play — tap a player, set score, putts, tee shot and green, Enter. The money updates after every hole.</p>`;
     renderLiveEditor(true);
     rest.innerHTML=`<div class="bar" style="margin-top:10px"><button onclick="startLive()">▶ Start round (${n} player${n>1?'s':''})</button></div>`;
     return;
@@ -1157,7 +1214,7 @@ function renderLive(){
   const played=playedHoleCount();
   html+='<div class="live-stand">';
   if(!played){html+='<p class="hint" style="margin:0">Standings appear after the first hole.</p>';}
-  else if(!G.robin&&!G.medal&&!G.ctp){html+='<p class="hint" style="margin:0">No games selected (section 2).</p>';}
+  else if(!G.robin&&!G.medal&&!G.ctp){html+='<p class="hint" style="margin:0">No games selected (Round setup).</p>';}
   else{
     const r=computeAll(buildRound());
     const gTotal={};
@@ -1181,7 +1238,7 @@ function renderLive(){
     if(sk.putts)skMsgs.push(`putts skipped on ${sk.putts}`);
     if(sk.holes)skMsgs.push(`${sk.holes} hole${sk.holes>1?'s':''} not scored for everyone`);
     if(G.robin&&skMsgs.length)html+=`<p class="hint" style="margin:6px 0 0"><span class="pill warn">⚠ ${skMsgs.join(' · ')}</span></p>`;
-    html+=`<p class="hint" style="margin:6px 0 0">Medal and CTP money assume the round ended now; Robin is the points so far at $${getBets().robinPerPoint}/pt. Full breakdown and settle-up in section 6.</p>`;
+    html+=`<p class="hint" style="margin:6px 0 0">Medal and CTP money assume the round ended now; Robin is the points so far at $${getBets().robinPerPoint}/pt. Full breakdown and settle-up under Results.</p>`;
   }
   html+='</div>';
   rest.innerHTML=html;
@@ -1842,7 +1899,7 @@ function applyImport(results){
   document.getElementById('rv-putts').checked=anyPutts;
   document.getElementById('rv-fir').checked=anyFir;
   document.getElementById('rv-gir').checked=anyGir;
-  init();
+  init();onGamesChange();
   const missing=[];
   if(!anyPutts)missing.push('putts');
   if(!anyFir)missing.push('fairways');
@@ -1873,7 +1930,7 @@ function applyImport(results){
     (dotConflicts.length?` <span class="warn">The dots on hole${dotConflicts.length>1?'s':''} ${dotConflicts.join(', ')} contradict each other between players — check the highlighted • cells.</span>`:'')+
     statWarns.map(w=>`<br><span class="warn">⚠ ${esc(w)}</span>`).join('')+
     `<br><span class="hint" style="display:block;margin:6px 0 2px">Checked against the card's own totals — ✓ verified · • read but nothing to check against · ⚠ mismatch · — missing:</span>${vsum}`+
-    '<br>Next: check any highlighted cells, confirm the Robin pairings (section 4), and pick the closest-to-the-pin winners (section 5).';
+    '<br>Next: fix any highlighted cells in the scorecard, confirm the Robin pairings, and pick the closest-to-the-pin winners.';
 }
 
 /* ===================== SAVED ROUNDS ===================== */
@@ -1912,6 +1969,7 @@ function updateSaveBar(){
 function startNewRound(){ // called whenever the app loads a different round's data
   loadedId=null;
   if(state&&state.live)delete state.live; // an import / saved round / reset replaces any round being entered live
+  if(state)delete state.liveDone;
   clearLive();
   const el=document.getElementById('roundName');if(el)el.value='';
   updateSaveBar();
@@ -1934,7 +1992,7 @@ function saveRound(asNew){
   const snap={
     id,name,savedAt:Date.now(),
     customPairs,
-    state:JSON.parse(JSON.stringify({players:state.players,nextId:state.nextId,holes:state.holes,scores:state.scores,segments:state.segments,ctpWinners:state.ctpWinners,flags:state.flags})),
+    state:JSON.parse(JSON.stringify({players:state.players,nextId:state.nextId,holes:state.holes,scores:state.scores,segments:state.segments,ctpWinners:state.ctpWinners,flags:state.flags,liveDone:!!state.liveDone})),
     ui:{
       bets:getBets(),games:getGames(),robinVars:getRobinVars(),
       splitSmall:document.getElementById('splitSmall').value,
@@ -1964,6 +2022,7 @@ function loadRound(id){
   Object.assign(state,JSON.parse(JSON.stringify(r.state)));
   state.flags=state.flags||{};
   delete state.live;clearLive();
+  if(!state.liveDone)delete state.liveDone;
   customPairs=!!r.customPairs;
   document.getElementById('roundName').value=r.name;
   document.getElementById('betMedal').value=r.ui.bets.medalPerPlayer;

@@ -77,7 +77,7 @@
   .togglerow { display:flex; gap:14px; flex-wrap:wrap; margin:6px 0 2px; }
   .togglerow label { display:flex; align-items:center; gap:5px; font-size:13px; color:var(--ink); margin:0; cursor:pointer; }
   .tabs { display:flex; gap:6px; margin-top:16px; background:#e3ece5; padding:4px; border-radius:12px; }
-  .tabs button { flex:1; background:transparent; color:var(--green-900); border-radius:9px; padding:10px 8px; font-size:14px; }
+  .tabs button { flex:1 1 0; min-width:0; background:transparent; color:var(--green-900); border-radius:9px; padding:10px 4px; font-size:13.5px; line-height:1.2; }
   .tabs button:hover { background:rgba(255,255,255,.5); }
   .tabs button.on { background:#fff; box-shadow:0 1px 3px rgba(20,53,31,.15); }
   .tabpane { margin-top:10px; }
@@ -139,7 +139,8 @@
   body.sheet-open { overflow:hidden; }
   #sheet { position:fixed; inset:0; z-index:20; }
   .sheet-back { position:absolute; inset:0; background:rgba(10,20,14,.55); }
-  .sheet-panel { position:absolute; left:0; right:0; bottom:0; background:#fff; border-radius:18px 18px 0 0; padding:8px 16px calc(16px + env(safe-area-inset-bottom)); max-height:92vh; overflow-y:auto; box-shadow:0 -8px 30px rgba(0,0,0,.25); animation:sheetUp .18s ease-out; }
+  .sheet-panel { position:absolute; left:0; right:0; bottom:0; background:#fff; border-radius:18px 18px 0 0; padding:8px 16px calc(16px + env(safe-area-inset-bottom)); max-height:92vh; overflow-y:auto; box-shadow:0 -8px 30px rgba(0,0,0,.25); }
+  #sheet.anim .sheet-panel { animation:sheetUp .18s ease-out; }
   @keyframes sheetUp { from { transform:translateY(40px); opacity:.6; } to { transform:none; opacity:1; } }
   .sheet-grip { width:44px; height:5px; border-radius:3px; background:#d9e0db; margin:2px auto 10px; }
   .sheet-head { display:flex; align-items:center; gap:12px; padding-bottom:10px; border-bottom:2px solid var(--green-100); }
@@ -191,8 +192,9 @@
 <main>
 
   <div class="tabs" role="tablist">
-    <button id="tab-live" class="on" role="tab" onclick="showTab('live')">✍️ Enter as you play</button>
-    <button id="tab-import" role="tab" onclick="showTab('import')">📷 Import from Grint</button>
+    <button id="tab-live" class="on" role="tab" onclick="showTab('live')">✍️ Play</button>
+    <button id="tab-import" role="tab" onclick="showTab('import')">📷 Import</button>
+    <button id="tab-saved" role="tab" onclick="showTab('saved')">💾 Saved</button>
   </div>
 
   <section class="card tabpane" id="liveCard" data-tab="live">
@@ -210,7 +212,7 @@
     <div id="importStatus"></div>
   </section>
 
-  <section class="card" id="savedCard" style="display:none">
+  <section class="card tabpane" id="savedCard" data-tab="saved">
     <h2>Saved rounds</h2>
     <p class="hint">Stored in this browser on this device. Open one to see its full audit and payouts again.</p>
     <div id="savedList"></div>
@@ -285,7 +287,7 @@
     </div>
   </section>
 
-  <p class="footer-note">All pools zero-sum: what winners collect equals what the group put in. Robin settles directly between players at the $/point rate on point differences. If screenshot import can't start (no internet or a blocked network), scores can always be entered by hand.<br><b>v16.3</b> — player name/handicap fields no longer need a second tap after editing another one · <b>v16.2</b> — two tabs at the top (Enter as you play / Import from Grint); player names and handicaps editable right in the live tab, before and during the round · <b>v16.1</b> — live round screen redesigned Grint-style: player list with Add Score, score sheet with big Score/Putts steppers, tee-shot pad (HIT or missed direction), green, dots and closest-to-pin; Enter moves to the next player · <b>v16</b> — live round: enter each hole on the course (strokes, putts, dots, fairway, green, CTP) and see Robin/Medal/CTP money update after every hole; autosaves on the phone and resumes if the page reloads · <b>v15.1</b> — GIR% totals must be a valid ninth (11%, 22%…) or they're ignored; mismatch warnings quote the text actually read · <b>v15</b> — player rows must look like players (phantom rows from misread stat labels can't appear); misread stat labels (e.g. GIR%) located from their neighbours instead of dropping the stat · <b>v14</b> — self-verifying import: fairways &amp; greens checked against the card's printed totals, dots cross-checked between players, per-player ✓/⚠ summary · Robin warns loudly when a variable is skipped for missing data</p>
+  <p class="footer-note">All pools zero-sum: what winners collect equals what the group put in. Robin settles directly between players at the $/point rate on point differences. If screenshot import can't start (no internet or a blocked network), scores can always be entered by hand.<br><b>v16.4</b> — saved rounds moved to a third tab · <b>v16.3</b> — player name/handicap fields no longer need a second tap after editing another one · <b>v16.2</b> — two tabs at the top (Enter as you play / Import from Grint); player names and handicaps editable right in the live tab, before and during the round · <b>v16.1</b> — live round screen redesigned Grint-style: player list with Add Score, score sheet with big Score/Putts steppers, tee-shot pad (HIT or missed direction), green, dots and closest-to-pin; Enter moves to the next player · <b>v16</b> — live round: enter each hole on the course (strokes, putts, dots, fairway, green, CTP) and see Robin/Medal/CTP money update after every hole; autosaves on the phone and resumes if the page reloads · <b>v15.1</b> — GIR% totals must be a valid ninth (11%, 22%…) or they're ignored; mismatch warnings quote the text actually read · <b>v15</b> — player rows must look like players (phantom rows from misread stat labels can't appear); misread stat labels (e.g. GIR%) located from their neighbours instead of dropping the stat · <b>v14</b> — self-verifying import: fairways &amp; greens checked against the card's printed totals, dots cross-checked between players, per-player ✓/⚠ summary · Robin warns loudly when a variable is skipped for missing data</p>
 </main>
 
 <script>
@@ -853,8 +855,7 @@ let curTab='live';
 function showTab(t){
   curTab=t;
   document.querySelectorAll('.tabpane').forEach(el=>{el.style.display=el.dataset.tab===t?'':'none';});
-  document.getElementById('tab-live').classList.toggle('on',t==='live');
-  document.getElementById('tab-import').classList.toggle('on',t==='import');
+  ['live','import','saved'].forEach(k=>document.getElementById('tab-'+k).classList.toggle('on',t===k));
   try{localStorage.setItem('gbTab',t);}catch(e){}
 }
 let livePlayersOpen=false;
@@ -1020,7 +1021,7 @@ function openSheet(pid){
     gir:!!s.gir,
     ctp:state.ctpWinners[hi]===pid,
   }};
-  renderSheet();
+  renderSheet(true);
   document.body.classList.add('sheet-open');
 }
 function closeSheet(){sheet=null;document.body.classList.remove('sheet-open');renderSheet();}
@@ -1052,9 +1053,10 @@ function sheetEnter(){
   renderResults();renderScorecard();renderCtp();saveLive();
   if(next)openSheet(next.id);else{document.body.classList.remove('sheet-open');renderSheet();}
 }
-function renderSheet(){
+function renderSheet(fresh){ // the slide-up animation only plays when the sheet opens, not on every tap
   let el=document.getElementById('sheet');
   if(!el){el=document.createElement('div');el.id='sheet';document.body.appendChild(el);}
+  el.classList.toggle('anim',!!fresh);
   if(!sheet||!state.live){el.innerHTML='';el.style.display='none';return;}
   const hi=state.live.hole;const h=state.holes[hi];const par=h.par;const p=state.players.find(x=>x.id===sheet.pid);
   const v=sheet.draft;const run=playerRunning(p.id);
@@ -1986,12 +1988,13 @@ function loadRound(id){
   document.getElementById('resultsWrap').scrollIntoView({behavior:'smooth'});
 }
 function renderSaved(){
-  const card=document.getElementById('savedCard');
-  if(!storeOK()){card.style.display='none';return;}
+  const list=document.getElementById('savedList');
+  const tab=document.getElementById('tab-saved');
+  if(!storeOK()){list.innerHTML='<p class="hint">Saving isn\'t available in this view — open the app at your golf-betting link to save rounds.</p>';if(tab)tab.textContent='💾 Saved';return;}
   const arr=loadStore();
-  if(!arr.length){card.style.display='none';return;}
-  card.style.display='';
-  document.getElementById('savedList').innerHTML=arr.map(r=>{
+  if(tab)tab.textContent='💾 Saved'+(arr.length?' ('+arr.length+')':'');
+  if(!arr.length){list.innerHTML='<p class="hint">No saved rounds yet. Finish a round (live or imported) and press "Save this round" under the results — it will show up here.</p>';return;}
+  list.innerHTML=arr.map(r=>{
     const d=new Date(r.savedAt);
     const sum=Object.entries(r.summary||{}).sort((a,b)=>b[1]-a[1]).map(([n,v])=>`${esc(n)} ${v>0?'+':(v<0?'−':'')}$${Math.abs(v)}`).join(' · ');
     const open=r.id===loadedId?' <span class="ok">• open</span>':'';
@@ -2018,7 +2021,7 @@ document.addEventListener('paste',e=>{
 
 state=freshState();
 if(restoreLive()){init();showTab('live');alertBar('Live round resumed — hole '+(state.live.hole+1));}
-else{init();let t='live';try{t=localStorage.getItem('gbTab')||'live';}catch(e){}showTab(t);}
+else{init();let t='live';try{t=localStorage.getItem('gbTab')||'live';}catch(e){}if(!['live','import','saved'].includes(t))t='live';showTab(t);}
 renderSaved();
 ['roundName'].forEach(id=>{document.getElementById(id).addEventListener('input',()=>{if(isLive())saveLive();});});
 </script>

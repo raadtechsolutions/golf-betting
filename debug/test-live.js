@@ -19,9 +19,12 @@ let fails=0;const ok=(c,m)=>{console.log((c?'PASS ':'FAIL ')+m);if(!c)fails++;};
     init();
   });
   // tabs
+  ok(await pg.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),'no horizontal overflow at phone width (page fits 390px)');
   ok(await pg.evaluate(()=>getComputedStyle(document.getElementById('importCard')).display==='none'&&getComputedStyle(document.getElementById('liveCard')).display!=='none'),'live tab shown by default, import hidden');
   await pg.click('#tab-import');
   ok(await pg.evaluate(()=>getComputedStyle(document.getElementById('importCard')).display!=='none'&&getComputedStyle(document.getElementById('liveCard')).display==='none'),'import tab switches panes');
+  await pg.click('#tab-saved');
+  ok(await pg.evaluate(()=>getComputedStyle(document.getElementById('savedCard')).display!=='none'&&document.getElementById('savedList').textContent.includes('No saved rounds yet')),'saved tab shows empty state');
   await pg.click('#tab-live');
   // in-tab player editor
   ok((await pg.$$('#liveWrap .ped input[type=text]')).length===4,'player editor shows 4 name inputs');
@@ -123,6 +126,8 @@ let fails=0;const ok=(c,m)=>{console.log((c?'PASS ':'FAIL ')+m);if(!c)fails++;};
   ok(await pg.evaluate(()=>!state.live&&localStorage.getItem('gbLive')==null),'loadSample clears live');
   const sampleRes=await pg.textContent('#resultsWrap');
   ok(sampleRes.includes('Who owes what')&&!sampleRes.includes('Live —'),'sample results render normally');
+  await pg.evaluate(()=>saveRound(false));
+  ok((await pg.textContent('#tab-saved')).includes('(1)')&&(await pg.$$('#savedList .seg')).length===1,'saved round appears in the Saved tab with a count');
   await pg.screenshot({path:'live-shot.png',fullPage:false});
   // screenshot of the live panel for a visual check
   await pg.evaluate(()=>{startLive();startLive();state.live.hole=0;liveSet('p1','strokes','tap');liveSet('p1','putts','tap');liveSet('p1','fir');liveSet('p2','strokes','tap');});

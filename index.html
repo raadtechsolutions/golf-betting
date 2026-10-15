@@ -147,6 +147,10 @@
   .pinfo { flex:1; min-width:0; }
   .pname { font-weight:700; font-size:16px; }
   .pname .hcp, .sheet-name .hcp { color:var(--ink-soft); font-weight:400; font-size:13px; }
+  .dotsb { display:inline-block; font-size:11.5px; font-weight:600; color:var(--ink-soft); background:var(--green-50); border:1px solid var(--line); border-radius:999px; padding:0 7px; vertical-align:middle; }
+  .dotsb.full { color:var(--green-700); border-color:var(--green-600); }
+  .dotsb.over { color:#fff; background:var(--red); border-color:var(--red); }
+  .dots-chip.over { background:var(--amber-bg); color:var(--amber); }
   .pdot { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:6px; vertical-align:middle; }
   .prun { margin-top:2px; font-size:14px; display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
   .prun .topar { background:var(--green-700); color:#fff; border-radius:999px; padding:1px 9px; font-weight:700; font-size:13px; }
@@ -236,8 +240,13 @@
 
   <section class="card tabpane" id="savedCard" data-tab="saved">
     <h2>Saved rounds</h2>
-    <p class="hint">Stored in this browser on this device. Open a round to see its results and scorecard.</p>
+    <p class="hint">Stored on this phone, inside this app. Open a round to see its results and scorecard. <b>Heads-up:</b> the home-screen app and Safari keep separate storage, and removing the icon from the home screen wipes the app's storage — to get a new version just close the app fully and reopen it (no need to delete the icon). Export a backup now and then to be safe.</p>
     <div id="savedList"></div>
+    <div class="bar" id="backupBar" style="margin-top:14px">
+      <button class="ghost small" onclick="exportRounds()">⬇ Export backup</button>
+      <button class="ghost small" onclick="document.getElementById('restoreFile').click()">⬆ Restore backup</button>
+      <input type="file" id="restoreFile" accept="application/json,.json" style="display:none" onchange="restoreRounds(this.files[0]);this.value=''">
+    </div>
   </section>
 
   <section class="card" id="setup">
@@ -314,8 +323,8 @@
   </section>
 
   <p class="footer-note">All pools zero-sum: what winners collect equals what the group put in. Robin settles directly between players at the $/point rate on point differences. If screenshot import can't start (no internet or a blocked network), scores can always be entered by hand.</p>
-  <div class="footer-note" style="margin-top:6px"><b>v17.1</b> — Saved tab is just the archive: no working sections underneath; opening a round shows its results and scorecard read-only ("Edit in Play tab" to change it)
-    <details class="verhist"><summary>Version history</summary><div><b>v17</b> — one player list (in the Play tab; the Import tab shows the players read from the card), Round setup shows only the settings of the games ticked, read-only Grint-style scorecard summary at the bottom ("Fix a cell" for import corrections), CTP picked on the par-3 score sheet · <b>v16.4</b> — saved rounds moved to a third tab · <b>v16.3</b> — player name/handicap fields no longer need a second tap after editing another one · <b>v16.2</b> — two tabs at the top (Enter as you play / Import from Grint); player names and handicaps editable right in the live tab, before and during the round · <b>v16.1</b> — live round screen redesigned Grint-style: player list with Add Score, score sheet with big Score/Putts steppers, tee-shot pad (HIT or missed direction), green, dots and closest-to-pin; Enter moves to the next player · <b>v16</b> — live round: enter each hole on the course (strokes, putts, dots, fairway, green, CTP) and see Robin/Medal/CTP money update after every hole; autosaves on the phone and resumes if the page reloads · <b>v15.1</b> — GIR% totals must be a valid ninth (11%, 22%…) or they're ignored; mismatch warnings quote the text actually read · <b>v15</b> — player rows must look like players (phantom rows from misread stat labels can't appear); misread stat labels (e.g. GIR%) located from their neighbours instead of dropping the stat · <b>v14</b> — self-verifying import: fairways &amp; greens checked against the card's printed totals, dots cross-checked between players, per-player ✓/⚠ summary · Robin warns loudly when a variable is skipped for missing data</div></details></div>
+  <div class="footer-note" style="margin-top:6px"><b>v17.2</b> — dots are played off the lowest handicap: each player shows "• used/expected" (handicap − lowest) and the app warns when a player has too many; Saved tab gets Export / Restore backup
+    <details class="verhist"><summary>Version history</summary><div><b>v17.1</b> — Saved tab is just the archive: no working sections underneath; opening a round shows its results and scorecard read-only ("Edit in Play tab" to change it) · <b>v17</b> — one player list (in the Play tab; the Import tab shows the players read from the card), Round setup shows only the settings of the games ticked, read-only Grint-style scorecard summary at the bottom ("Fix a cell" for import corrections), CTP picked on the par-3 score sheet · <b>v16.4</b> — saved rounds moved to a third tab · <b>v16.3</b> — player name/handicap fields no longer need a second tap after editing another one · <b>v16.2</b> — two tabs at the top (Enter as you play / Import from Grint); player names and handicaps editable right in the live tab, before and during the round · <b>v16.1</b> — live round screen redesigned Grint-style: player list with Add Score, score sheet with big Score/Putts steppers, tee-shot pad (HIT or missed direction), green, dots and closest-to-pin; Enter moves to the next player · <b>v16</b> — live round: enter each hole on the course (strokes, putts, dots, fairway, green, CTP) and see Robin/Medal/CTP money update after every hole; autosaves on the phone and resumes if the page reloads · <b>v15.1</b> — GIR% totals must be a valid ninth (11%, 22%…) or they're ignored; mismatch warnings quote the text actually read · <b>v15</b> — player rows must look like players (phantom rows from misread stat labels can't appear); misread stat labels (e.g. GIR%) located from their neighbours instead of dropping the stat · <b>v14</b> — self-verifying import: fairways &amp; greens checked against the card's printed totals, dots cross-checked between players, per-player ✓/⚠ summary · Robin warns loudly when a variable is skipped for missing data</div></details></div>
 </main>
 
 <script>
@@ -1075,6 +1084,19 @@ function holeComplete(hi){ // every player has strokes (putts optional, but surf
   return state.players.every(p=>state.scores[p.id][hi]&&state.scores[p.id][hi].strokes!=null);
 }
 function toParTxt(n){return n===0?'E':(n>0?'+'+n:String(n));}
+// Dots are played off the lowest handicap in the group: a player's expected dots for the
+// round = handicap − lowest handicap (the low man gets none). Over that → warn.
+function dotsExpected(pid){
+  const p=state.players.find(x=>x.id===pid);if(!p)return 0;
+  const minH=Math.min(...state.players.map(x=>x.handicap||0));
+  return Math.max(0,Math.round((p.handicap||0)-minH));
+}
+function dotsUsed(pid){return sum((state.scores[pid]||[]).map(x=>x&&x.dots||0));}
+function dotsBadge(pid,extra){ // "dots 3/5" with an alert when over the expected count
+  const used=dotsUsed(pid)+(extra||0),exp=dotsExpected(pid);
+  const over=used>exp;
+  return `<span class="dotsb ${over?'over':(used===exp?'full':'')}" title="Handicap strokes used so far / expected for the round (handicap minus the lowest handicap)">• ${used}/${exp}${over?' ⚠':''}</span>`;
+}
 function playerRunning(pid){ // gross strokes and to-par over the holes this player has entered
   let gross=0,par=0,n=0;
   (state.scores[pid]||[]).forEach((s,hi)=>{if(s&&s.strokes!=null){gross+=s.strokes;par+=state.holes[hi].par;n++;}});
@@ -1142,7 +1164,7 @@ function renderSheet(fresh){ // the slide-up animation only plays when the sheet
     <div class="sheet-head">
       <div class="avatar">${esc(initials(p.name))}</div>
       <div class="sheet-who"><div class="sheet-name">${esc(p.name)} <span class="hcp">[${p.handicap||0}]</span></div>
-        <div class="sheet-run"><b>${toParTxt(run.toPar)}</b> <span>${run.gross}</span> <small>· hole ${h.number} · par ${par}</small></div></div>
+        <div class="sheet-run"><b>${toParTxt(run.toPar)}</b> <span>${run.gross}</span> <small>· hole ${h.number} · par ${par}</small> ${dotsBadge(p.id,v.dots-(state.scores[p.id][hi].dots||0))}</div></div>
       <button class="enter-btn" onclick="sheetEnter()">Enter</button>
     </div>
     <div class="sheet-body">
@@ -1165,7 +1187,7 @@ function renderSheet(fresh){ // the slide-up animation only plays when the sheet
     </div>
     <div class="sheet-row">
       ${par===3?'':`<button class="chip ${v.gir?'on':''}" onclick="sheetToggle('gir')"><span class="ico">⛳</span>Green in reg${v.gir?' ✓':''}</button>`}
-      <div class="chip dots-chip"><span class="ico">•</span>Dots <button onclick="sheetAdj('dots',-1)">−</button><b>${v.dots}</b><button onclick="sheetAdj('dots',1)">+</button></div>
+      <div class="chip dots-chip ${dotsUsed(p.id)-(state.scores[p.id][hi].dots||0)+v.dots>dotsExpected(p.id)?'over':''}"><span class="ico">•</span>Dots <button onclick="sheetAdj('dots',-1)">−</button><b>${v.dots}</b><button onclick="sheetAdj('dots',1)">+</button></div>
       ${par===3&&getGames().ctp?`<button class="chip ${v.ctp?'on':''}" onclick="sheetToggle('ctp')"><span class="ico">🎯</span>Closest to pin${v.ctp?' ✓':''}</button>`:''}
     </div>
   </div>`;
@@ -1217,13 +1239,16 @@ function renderLive(){
     }
     html+=`<div class="prow ${entered?'done':''}" onclick="openSheet('${p.id}')">
       <div class="avatar">${esc(initials(p.name))}</div>
-      <div class="pinfo"><div class="pname">${dot}${esc(p.name)} <span class="hcp">[${p.handicap||0}]</span></div>
+      <div class="pinfo"><div class="pname">${dot}${esc(p.name)} <span class="hcp">[${p.handicap||0}]</span> ${dotsBadge(p.id)}</div>
         <div class="prun"><span class="topar">${toParTxt(run.toPar)}</span> <span class="gross">(${run.gross})</span>${summary?`<span class="psum">${summary}</span>`:''}</div></div>
       <button class="addscore" onclick="event.stopPropagation();openSheet('${p.id}')">${entered?'Edit':'Add<br>Score'}</button>
     </div>`;
   });
   html+='</div>';
   const missingS=state.players.filter(p=>state.scores[p.id][hi].strokes==null).map(p=>p.name);
+  const overDots=state.players.filter(p=>dotsUsed(p.id)>dotsExpected(p.id)).map(p=>`${esc(p.name)} ${dotsUsed(p.id)}/${dotsExpected(p.id)}`);
+  const minName=state.players.reduce((a,b)=>((b.handicap||0)<(a.handicap||0)?b:a),state.players[0]);
+  if(overDots.length)html+=`<p class="hint" style="margin:8px 0 0"><span class="pill warn">⚠ Too many dots: ${overDots.join(', ')} — dots are played off ${esc(minName.name)}'s handicap (${minName.handicap||0}), so each player gets handicap − ${minName.handicap||0} for the round. Check the • on the holes already entered.</span></p>`;
   html+=`<div class="holedots">${state.holes.map((x,i)=>`<span class="${holeComplete(i)?'done':''} ${i===hi?'cur':''}" onclick="liveGo(${i})" title="Hole ${x.number}">${x.number}</span>`).join('')}</div>`;
   html+=`<div class="bar">${hi<nH-1?`<button onclick="liveGo(${hi+1})" ${missingS.length?'class="ghost"':''}>Next hole ›</button>`:`<button onclick="endLive()">✓ Finish round</button>`}<button class="ghost small" onclick="endLive()">${hi<nH-1?'End round early':'Finish'}</button></div>`;
   // standings through the last hole played
@@ -2063,6 +2088,35 @@ function loadRound(id){
   document.getElementById('resultsWrap').scrollIntoView({behavior:'smooth'});
 }
 let savedOpenId=null;
+function exportRounds(){
+  const arr=loadStore();
+  if(!arr.length){alertBar('Nothing to export yet.');return;}
+  const data={app:'golf-betting',exportedAt:new Date().toISOString(),rounds:arr};
+  const blob=new Blob([JSON.stringify(data)],{type:'application/json'});
+  const name='golf-betting-rounds-'+new Date().toISOString().slice(0,10)+'.json';
+  const file=new File([blob],name,{type:'application/json'});
+  if(navigator.share&&navigator.canShare&&navigator.canShare({files:[file]})){
+    navigator.share({files:[file],title:'Golf betting rounds'}).catch(()=>{});return;}
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();
+  setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},1000);
+}
+function restoreRounds(file){
+  if(!file)return;
+  const rd=new FileReader();
+  rd.onload=()=>{
+    let data;try{data=JSON.parse(rd.result);}catch(e){alertBar('That file isn\'t a golf-betting backup.');return;}
+    const rounds=Array.isArray(data)?data:(data&&Array.isArray(data.rounds)?data.rounds:null);
+    if(!rounds){alertBar('That file isn\'t a golf-betting backup.');return;}
+    const arr=loadStore();const have=new Set(arr.map(r=>r.id));
+    let added=0;
+    rounds.filter(r=>r&&typeof r==='object'&&r.state).forEach(r=>{if(!r.id)r.id=newRoundId();if(!have.has(r.id)){arr.push(r);have.add(r.id);added++;}});
+    arr.sort((a,b)=>(b.savedAt||0)-(a.savedAt||0));
+    try{saveStore(arr);}catch(e){alertBar('Couldn\'t restore — storage is full.');return;}
+    savedOpenId=null;renderSaved();
+    alertBar(added?`Restored ${added} round${added>1?'s':''} ✓`:'Those rounds are already here.');
+  };
+  rd.readAsText(file);
+}
 function viewSaved(id){savedOpenId=id;renderSaved();document.getElementById('savedCard').scrollIntoView({behavior:'smooth',block:'start'});}
 function closeSavedView(){savedOpenId=null;renderSaved();}
 function savedViewHtml(r){

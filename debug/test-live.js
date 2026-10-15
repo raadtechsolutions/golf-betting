@@ -72,10 +72,18 @@ let fails=0;const ok=(c,m)=>{console.log((c?'PASS ':'FAIL ')+m);if(!c)fails++;};
   await pg.click('#sheet .dots-chip button:last-child');                   // dots +
   await pg.click('#sheet .enter-btn');
   ok(await pg.evaluate(()=>{const s=state.scores.p1[0];return s.strokes===state.holes[0].par+1&&s.putts===1&&s.fir===true&&s.gir===true&&s.dots===1;}),'Enter commits score/putts/FW/GR/dots');
+  // dots off the lowest handicap: Rod 14, Jon 5, Max 21, Leo 11 -> expected 9 / 0 / 16 / 6
+  ok(await pg.evaluate(()=>{const m=Math.min(...state.players.map(p=>p.handicap));return state.players.every(p=>dotsExpected(p.id)===p.handicap-m)&&dotsExpected('p2')===0;}),'expected dots = handicap − lowest handicap (low man 0)');
+  ok((await pg.textContent('.prow:nth-child(1) .dotsb')).includes('1/'+await pg.evaluate(()=>dotsExpected('p1'))),'row badge shows dots used/expected');
   ok((await pg.textContent('#sheet .sheet-name')).startsWith('Jon'),'Enter advances to next player (Jon)');
   await pg.click('#sheet .tee-arrow.w');
   await pg.click('#sheet .enter-btn');
   ok(await pg.evaluate(()=>{const s=state.scores.p2[0];return s.strokes===state.holes[0].par&&s.putts===2&&s.fir===false&&s.firDir==='L';}),'missed-left arrow stores fir=false + direction');
+  // Jon (lowest hcp) takes a dot -> over -> alert
+  await pg.evaluate(()=>{state.scores.p2[0].dots=1;renderResults();});
+  ok(await pg.evaluate(()=>document.querySelector('.prow:nth-child(2) .dotsb').classList.contains('over')&&document.getElementById('liveWrap').textContent.includes('Too many dots: Jon 1/0')),'too many dots → red badge + warning naming the low handicap');
+  await pg.evaluate(()=>{state.scores.p2[0].dots=0;renderResults();});
+  ok(await pg.evaluate(()=>!document.getElementById('liveWrap').textContent.includes('Too many dots')),'warning clears when fixed');
   await pg.click('#sheet .enter-btn');await pg.click('#sheet .enter-btn');
   ok(!(await pg.$('#sheet .sheet-panel')),'sheet closes after last player');
   ok(await pg.evaluate(()=>holeComplete(0)),'hole 1 complete');
@@ -158,6 +166,18 @@ let fails=0;const ok=(c,m)=>{console.log((c?'PASS ':'FAIL ')+m);if(!c)fails++;};
   ok(await pg.evaluate(()=>curTab==='live'&&loadedId!=null&&getComputedStyle(document.getElementById('cardResults')).display!=='none'),'Edit in Play tab loads the round into the working sections');
   const workTot=await pg.evaluate(()=>[...document.querySelectorAll('#resultsWrap .totals-table tbody tr')].map(tr=>tr.lastElementChild.textContent).join(','));
   ok(savedTot===workTot&&savedTot.length>0,'viewer totals match the working results: '+workTot);
+  // saving a second round keeps the first; backup restore merges without duplicates
+  await pg.evaluate(()=>{document.getElementById('roundName').value='Second round';saveRound(true);});
+  ok(await pg.evaluate(()=>loadStore().length===2),'saving a second round keeps both');
+  const backup=await pg.evaluate(()=>JSON.stringify({app:'golf-betting',rounds:loadStore()}));
+  await pg.evaluate(()=>{localStorage.removeItem('gbRounds');renderSaved();});
+  ok(await pg.evaluate(()=>loadStore().length===0),'(simulated wipe) archive empty');
+  await pg.evaluate(b=>{restoreRounds(new File([b],'b.json',{type:'application/json'}));},backup);
+  await pg.waitForTimeout(200);
+  ok(await pg.evaluate(()=>loadStore().length===2),'restore brings both rounds back');
+  await pg.evaluate(b=>{restoreRounds(new File([b],'b.json',{type:'application/json'}));},backup);
+  await pg.waitForTimeout(200);
+  ok(await pg.evaluate(()=>loadStore().length===2),'restoring again does not duplicate');
   await pg.screenshot({path:'live-shot.png',fullPage:false});
   // screenshot of the live panel for a visual check
   await pg.evaluate(()=>{startLive();startLive();state.live.hole=0;liveSet('p1','strokes','tap');liveSet('p1','putts','tap');liveSet('p1','fir');liveSet('p2','strokes','tap');});
